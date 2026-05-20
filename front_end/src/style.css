@@ -1,0 +1,85 @@
+@import "tailwindcss";
+
+:root {
+  /* Brand */
+  --primary: #0c1832;
+  --primary-light: #1a2d4a;
+  --accent: #d97706;
+  --accent-light: #f59e0b;
+  --accent-glow: rgba(217, 119, 6, 0.15);
+
+  /* Surfaces */
+  --bg-page: #f3f4f8;
+  --bg-card: #ffffff;
+  --bg-sidebar: #0c1832;
+  --bg-sidebar-hover: rgba(255,255,255,0.06);
+  --bg-sidebar-active: rgba(217,119,6,0.15);
+  --bg-search: #f8f9fc;
+  --bg-table-stripe: #fafbfd;
+
+  /* Text */
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+  --text-on-dark: #f1f5f9;
+  --text-on-dark-muted: rgba(255,255,255,0.5);
+
+  /* Borders */
+  --border: #e8ecf2;
+  --border-light: #f0f2f6;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(12,24,50,0.04);
+  --shadow-md: 0 4px 16px rgba(12,24,50,0.06);
+  --shadow-lg: 0 12px 32px rgba(12,24,50,0.08);
+  --shadow-warm: 0 4px 20px rgba(217,119,6,0.12);
+  --shadow-premium: 0 10px 15px -3px rgba(0, 0, 0, 0.04), 0 4px 6px -2px rgba(0, 0, 0, 0.02);
+
+  /* Radius */
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
+
+  /* Motion */
+  --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@utility shadow-premium {
+  box-shadow: var(--shadow-premium);
+}
+
+body {
+  font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  margin: 0;
+  background-color: var(--bg-page);
+  color: var(--text-primary);
+  line-height: 1.5;
+}
+
+/* Page enter animation */
+.page-enter-active {
+  animation: pageEnter 0.35s ease-out;
+}
+@keyframes pageEnter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Fade transition */
+.fade-enter-active, .fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.fade-enter-from, .fade-leave-to {
+  opacity: 0;
+}

@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>简单 API 演示</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f0f2f5;
+        }
+        .card {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1 { color: #1890ff; text-align: center; }
+        .btn {
+            background: #1890ff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .btn:hover { background: #40a9ff; }
+        #output {
+            background: #f6f8fa;
+            border: 1px solid #d1d5da;
+            border-radius: 4px;
+            padding: 15px;
+            margin-top: 20px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>🚀 Nest.js 静态资源 API 演示</h1>
+        
+        <p><strong>当前页面：</strong><span id="currentUrl"></span></p>
+        <p><strong>API 地址：</strong><span id="apiUrl"></span></p>
+        
+        <hr>
+        
+        <h3>快速测试：</h3>
+        <button class="btn" onclick="quickTest()">快速 API 测试</button>
+        <button class="btn" onclick="getMenus()">获取菜单</button>
+        <button class="btn" onclick="getUsers()">获取用户</button>
+        <button class="btn" onclick="clearOutput()">清空输出</button>
+        
+        <div id="output">点击上面的按钮开始测试...</div>
+    </div>
+
+    <script>
+        // 简单的配置
+        const API_BASE = '/adminApi';
+        
+        // 初始化页面信息
+        document.getElementById('currentUrl').textContent = window.location.href;
+        document.getElementById('apiUrl').textContent = window.location.origin + API_BASE;
+        
+        // 输出函数
+        function output(message) {
+            const outputDiv = document.getElementById('output');
+            const timestamp = new Date().toLocaleTimeString();
+            outputDiv.textContent += `[${timestamp}] ${message}\n`;
+            outputDiv.scrollTop = outputDiv.scrollHeight;
+        }
+        
+        // 清空输出
+        function clearOutput() {
+            document.getElementById('output').textContent = '';
+        }
+        
+        // 通用 API 请求
+        async function callApi(endpoint, method = 'GET', data = null) {
+            const url = `${API_BASE}${endpoint}`;
+            output(`发起请求: ${method} ${url}`);
+            
+            try {
+                const options = {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                };
+                
+                if (data) {
+                    options.body = JSON.stringify(data);
+                }
+                
+                const response = await fetch(url, options);
+                const result = await response.json();
+                
+                if (response.ok) {
+                    output(`✅ 成功 (${response.status}): ${JSON.stringify(result, null, 2)}`);
+                } else {
+                    output(`❌ 失败 (${response.status}): ${JSON.stringify(result, null, 2)}`);
+                }
+                
+                return result;
+            } catch (error) {
+                output(`💥 错误: ${error.message}`);
+                return null;
+            }
+        }
+        
+        // 测试函数
+        async function quickTest() {
+            output('=== 开始快速测试 ===');
+            await callApi('/util/test');
+        }
+        
+        async function getMenus() {
+            output('=== 获取菜单列表 ===');
+            await callApi('/menu');
+        }
+        
+        async function getUsers() {
+            output('=== 获取用户列表 ===');
+            await callApi('/user');
+        }
+        
+        // 页面加载完成
+        output('页面已加载，准备就绪！');
+        output(`静态资源服务路径: ${window.location.pathname}`);
+        output(`API 基础路径: ${API_BASE}`);
+    </script>
+</body>
+</html> 
