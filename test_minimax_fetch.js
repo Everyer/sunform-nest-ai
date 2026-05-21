@@ -1,4 +1,4 @@
-const apiKey = 'sk-api-f1iqpoIl9caOwotHgrpoge_F2XgdrApOo7bEDBOCt-ITV_DsuGEEYI0U9KBJqiYyCq-BEdOQ4nW7-e6xy4Ycq10u8RcwIVNW2hOH_wM7_FgdFzQerPwp0EM';
+const apiKey = process.env.AI_AGENT_API_KEY || '';
 const url = 'https://api.minimaxi.com/v1/embeddings';
 
 async function testEmbedding() {

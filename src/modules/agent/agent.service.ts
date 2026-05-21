@@ -387,7 +387,7 @@ export class AgentService implements OnModuleInit, OnModuleDestroy {
   private readonly configPath: string;
 
   private llmConfig = {
-    apiKey: (process.env.AI_AGENT_API_KEY || 'sk-cp-je2E8r2_MASzUY5OO2gEirUluf1JgZQQEuezB0VifE1AMPZ1da9yb4j3EDrDLA131CbyUjcdGkkzkCJvL59UnmSYQDsGImTpjlHdVDjMF7mel1_2-Q_8M5I').trim(),
+    apiKey: (process.env.AI_AGENT_API_KEY || '').trim(),
     baseUrl: (process.env.AI_AGENT_BASE_URL || 'https://api.minimaxi.com/v1').trim(),
     model: (process.env.AI_AGENT_MODEL || 'MiniMax-M2.7').trim(),
   };

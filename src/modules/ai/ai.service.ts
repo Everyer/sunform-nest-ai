@@ -36,7 +36,7 @@ export class AiService {
     // 优先读取 AI_AGENT_API_KEY 作为全局统一的 AI 密钥，兼容旧版 SILICONFLOW_API_KEY
     this.siliconflowApiKey = this.configService.get<string>('AI_AGENT_API_KEY') ||
       this.configService.get<string>('SILICONFLOW_API_KEY') ||
-      'sk-cp-je2E8r2_MASzUY5OO2gEirUluf1JgZQQEuezB0VifE1AMPZ1da9yb4j3EDrDLA131CbyUjcdGkkzkCJvL59UnmSYQDsGImTpjlHdVDjMF7mel1_2-Q_8M5I';
+      '';
 
     // 优先读取 AI_AGENT_BASE_URL 并自动剥离 /chat/completions 后缀，规范化为 Base URL
     const rawBaseUrl = this.configService.get<string>('AI_AGENT_BASE_URL') ||
@@ -45,7 +45,7 @@ export class AiService {
     this.siliconflowBaseUrl = rawBaseUrl.replace(/\/chat\/completions\/?$/, '').replace(/\/$/, '');
 
     // Coze API 配置
-    this.cozeApiKey = this.configService.get<string>('COZE_API_KEY') || 'pat_a7d9C2KTexEjWNmfdt22nQEZUqhkX1vd28We5b6W642hWrW9Awo7HtbupRlUJ5Uv';
+    this.cozeApiKey = this.configService.get<string>('COZE_API_KEY') || '';
     this.cozeBaseUrl = this.configService.get<string>('COZE_BASE_URL') ||
       'https://api.coze.cn/v1/workflow/';
   }

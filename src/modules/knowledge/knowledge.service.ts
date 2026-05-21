@@ -25,7 +25,7 @@ export class KnowledgeService {
     // 向量 Embedding 专用 Key（AI_EMBEDDING_API_KEY），回退到语言模型 Key
     this.embeddingApiKey = process.env.AI_EMBEDDING_API_KEY
       || process.env.AI_AGENT_API_KEY
-      || 'sk-api-f1iqpoIl9caOwotHgrpoge_F2XgdrApOo7bEDBOCt-ITV_DsuGEEYI0U9KBJqiYyCq-BEdOQ4nW7-e6xy4Ycq10u8RcwIVNW2hOH_wM7_FgdFzQerPwp0EM';
+      || '';
     // 向量 Embedding 专用 Base URL（AI_EMBEDDING_BASE_URL），不带 /chat/completions
     const rawEmbeddingUrl = process.env.AI_EMBEDDING_BASE_URL
       || process.env.AI_AGENT_BASE_URL
