@@ -24,9 +24,9 @@ export class DocumentChunk extends BaseModel {
   content: string;
 
   @Column({
-    type: (DataTypes as any).VECTOR(1024),
+    type: (DataTypes as any).VECTOR(1536),
     allowNull: true,
-    comment: '向量数据 (1024维)',
+    comment: '向量数据 (1536维)',
   })
   embedding: number[];
 }

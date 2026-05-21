@@ -1,19 +1,32 @@
 <template>
   <div class="knowledge-container">
     <SyCard title="智能知识库中心">
-      <template #header-extra>
-        <n-button type="primary" secondary @click="openCreate">
+      <!-- 顶部操作与筛选栏 -->
+      <div class="toolbar-section">
+        <div class="search-box">
+          <n-input
+            v-model:value="searchKeyword"
+            placeholder="输入知识库名称或描述进行搜索..."
+            clearable
+            style="width: 320px;"
+          >
+            <template #prefix>
+              <n-icon><SearchOutline /></n-icon>
+            </template>
+          </n-input>
+        </div>
+        <n-button type="primary" @click="openCreate">
           <template #icon>
             <n-icon><AddOutline /></n-icon>
           </template>
-          新建知识库
+          创建新知识库
         </n-button>
-      </template>
+      </div>
 
       <!-- 骨架屏加载 -->
-      <div v-if="loading" style="padding: 24px;">
-        <n-grid :cols="24" :x-gutter="20" :y-gutter="20">
-          <n-grid-item :span="8" v-for="i in 3" :key="i">
+      <div v-if="loading" style="padding: 24px 0;">
+        <n-grid cols="1 s:2 m:3 l:4" responsive="screen" :x-gutter="16" :y-gutter="16">
+          <n-grid-item v-for="i in 4" :key="i">
             <n-card>
               <n-skeleton text :repeat="2" />
               <n-skeleton text style="width: 60%" />
@@ -23,80 +36,96 @@
       </div>
 
       <!-- 空数据状态 -->
-      <div v-else-if="bases.length === 0" class="empty-state">
-        <n-empty description="当前暂无知识库，立即创建一个吧！">
+      <div v-else-if="filteredBases.length === 0" class="empty-state">
+        <n-empty :description="searchKeyword ? '未找到符合搜索条件的知识库' : '当前暂无知识库，立即创建一个吧！'">
           <template #extra>
-            <n-button type="primary" @click="openCreate">创建第一个知识库</n-button>
+            <n-button v-if="!searchKeyword" type="primary" @click="openCreate">创建第一个知识库</n-button>
+            <n-button v-else secondary @click="searchKeyword = ''">清空搜索条件</n-button>
           </template>
         </n-empty>
       </div>
 
       <!-- 知识库卡片列表 -->
       <div v-else class="cards-grid">
-        <n-grid :cols="24" :x-gutter="20" :y-gutter="20" item-responsive>
+        <n-grid cols="1 s:2 m:3 l:3 xl:4" responsive="screen" :x-gutter="20" :y-gutter="20">
           <n-grid-item 
-            :span="24" 
-            :m="12" 
-            :l="8" 
-            v-for="base in bases" 
+            v-for="base in filteredBases" 
             :key="base.id"
           >
-            <div class="premium-card">
-              <div class="card-bg-gradient"></div>
-              <div class="card-content">
-                <!-- 头部 -->
-                <div class="card-header">
-                  <div class="icon-wrapper">
-                    <n-icon size="26" color="#3b82f6"><BookOutline /></n-icon>
+            <div class="base-card">
+              <!-- 彩色渐变顶部条 -->
+              <div class="card-accent-bar"></div>
+              
+              <div class="card-body">
+                <!-- 头部：图标 + 标题 + 状态 -->
+                <div class="card-head">
+                  <div class="icon-box">
+                    <n-icon size="24" color="#2563eb"><BookOutline /></n-icon>
                   </div>
-                  <div class="title-section">
-                    <h3 class="base-name">{{ base.name }}</h3>
-                    <n-tag size="small" :type="base.status === 'active' ? 'success' : 'default'" round>
-                      {{ base.status === 'active' ? '启用中' : '已禁用' }}
-                    </n-tag>
-                  </div>
-                </div>
-
-                <!-- 描述 -->
-                <p class="base-desc">{{ base.description || '暂无描述信息...' }}</p>
-
-                <!-- 统计指标 (Bento Grid 样式) -->
-                <div class="stats-bar">
-                  <div class="stat-item">
-                    <span class="stat-val">{{ base.documents ? base.documents.length : 0 }}</span>
-                    <span class="stat-label">关联文档</span>
-                  </div>
-                  <div class="stat-item">
-                    <span class="stat-val">{{ formatTotalChunks(base.documents) }}</span>
-                    <span class="stat-label">向量切片</span>
-                  </div>
-                  <div class="stat-item">
-                    <span class="stat-val">{{ formatTotalSize(base.documents) }}</span>
-                    <span class="stat-label">库大小</span>
+                  <div class="title-box">
+                    <h3 class="base-title" :title="base.name">{{ base.name }}</h3>
+                    <div class="status-row">
+                      <n-tag size="small" :type="base.status === 'active' ? 'success' : 'warning'" :bordered="false" round>
+                        {{ base.status === 'active' ? '已启用' : '已禁用' }}
+                      </n-tag>
+                    </div>
                   </div>
                 </div>
 
-                <!-- 底部操作区 -->
-                <div class="card-actions">
+                <!-- 描述内容 -->
+                <div class="card-desc">
+                  {{ base.description || '无描述。点击下方管理文档按钮以导入文本或进行语义向量匹配测试。' }}
+                </div>
+
+                <!-- 统计面板 (Bento Box 样式) -->
+                <div class="card-stats">
+                  <div class="stat-block">
+                    <div class="stat-num">{{ base.documents ? base.documents.length : 0 }}</div>
+                    <div class="stat-lbl">关联文档</div>
+                  </div>
+                  <div class="stat-block">
+                    <div class="stat-num">{{ formatTotalChunks(base.documents) }}</div>
+                    <div class="stat-lbl">向量切片</div>
+                  </div>
+                  <div class="stat-block">
+                    <div class="stat-num">{{ formatTotalSize(base.documents) }}</div>
+                    <div class="stat-lbl">数据大小</div>
+                  </div>
+                </div>
+
+                <!-- 底部操作区 (彻底暴露，绝无溢出隐藏问题) -->
+                <div class="card-footer">
                   <n-button 
                     type="primary" 
-                    size="medium" 
-                    style="flex: 1;" 
+                    secondary
+                    style="flex: 1; font-weight: 600;" 
                     @click="manageDocs(base)"
                   >
                     <template #icon>
                       <n-icon><FolderOpenOutline /></n-icon>
                     </template>
-                    管理文档 & 搜索
+                    管理文档 & 检索
                   </n-button>
                   
                   <n-space :size="8">
-                    <n-button circle secondary @click="openEdit(base)">
+                    <n-button 
+                      quaternary 
+                      circle 
+                      type="info"
+                      title="编辑知识库"
+                      @click="openEdit(base)"
+                    >
                       <template #icon>
                         <n-icon><CreateOutline /></n-icon>
                       </template>
                     </n-button>
-                    <n-button circle secondary type="error" @click="handleDelete(base)">
+                    <n-button 
+                      quaternary 
+                      circle 
+                      type="error"
+                      title="删除知识库"
+                      @click="handleDelete(base)"
+                    >
                       <template #icon>
                         <n-icon><TrashOutline /></n-icon>
                       </template>
@@ -129,14 +158,14 @@
           path="name"
           :rule="{ required: true, message: '请输入知识库名称', trigger: 'blur' }"
         >
-          <n-input v-model:value="formData.name" placeholder="例如：产品说明书、HR规章制度" />
+          <n-input v-model:value="formData.name" placeholder="请输入知识库名称，例如：产品FAQ手册" />
         </n-form-item>
-        <n-form-item label="描述内容" path="description">
+        <n-form-item label="描述介绍" path="description">
           <n-input
             v-model:value="formData.description"
             type="textarea"
             :rows="3"
-            placeholder="请输入知识库的背景、包含文档类别等描述信息"
+            placeholder="简单描述一下这个知识库的用途、背景等"
           />
         </n-form-item>
       </n-form>
@@ -144,16 +173,33 @@
         <n-space justify="end">
           <n-button @click="modalVisible = false">取消</n-button>
           <n-button type="primary" :loading="submitting" @click="handleSubmit">
-            确认创建
+            确定
           </n-button>
         </n-space>
       </template>
+    </n-modal>
+
+    <!-- 文档管理与语义检索大弹窗 -->
+    <n-modal
+      v-model:show="docModalVisible"
+      preset="card"
+      style="width: 1300px; max-width: 96vw; --n-body-padding: 0 24px 24px 24px;"
+      :title="`知识库文档管理 & 检索 - ${selectedBaseName}`"
+      :mask-closable="false"
+      @after-leave="fetchBases"
+    >
+      <DocumentsView
+        v-if="docModalVisible"
+        :base-id="selectedBaseId"
+        :base-name="selectedBaseName"
+        :is-modal="true"
+      />
     </n-modal>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   NGrid,
@@ -177,10 +223,12 @@ import {
   BookOutline,
   FolderOpenOutline,
   CreateOutline,
-  TrashOutline
+  TrashOutline,
+  SearchOutline
 } from '@vicons/ionicons5'
 import SyCard from '@/components/SyCard/index.vue'
 import { listBases, createBase, updateBase, deleteBase } from '@/api/knowledge'
+import DocumentsView from './documents.vue'
 
 const router = useRouter()
 const message = useMessage()
@@ -188,16 +236,32 @@ const dialog = useDialog()
 
 const loading = ref(false)
 const bases = ref([])
+const searchKeyword = ref('')
 const modalVisible = ref(false)
 const modalTitle = ref('新建知识库')
 const submitting = ref(false)
 const isEdit = ref(false)
 const formRef = ref(null)
 
+const docModalVisible = ref(false)
+const selectedBaseId = ref('')
+const selectedBaseName = ref('')
+
 const formData = reactive({
   id: '',
   name: '',
   description: ''
+})
+
+// 根据搜索关键词过滤知识库
+const filteredBases = computed(() => {
+  const keyword = searchKeyword.value.trim().toLowerCase()
+  if (!keyword) return bases.value
+  return bases.value.filter(
+    b => 
+      b.name.toLowerCase().includes(keyword) || 
+      (b.description && b.description.toLowerCase().includes(keyword))
+  )
 })
 
 onMounted(() => {
@@ -284,17 +348,11 @@ function handleDelete(base) {
 }
 
 function manageDocs(base) {
-  // 跳转到文档管理页面，并通过 Query 传参
-  router.push({
-    path: '/modules/knowledge/documents',
-    query: {
-      baseId: base.id,
-      baseName: base.name
-    }
-  })
+  selectedBaseId.value = base.id
+  selectedBaseName.value = base.name
+  docModalVisible.value = true
 }
 
-// === 统计数值智能处理方法 ===
 function formatTotalChunks(documents) {
   if (!documents || documents.length === 0) return 0
   return documents.reduce((acc, doc) => acc + (doc.chunkCount || 0), 0)
@@ -311,7 +369,18 @@ function formatTotalSize(documents) {
 
 <style scoped>
 .knowledge-container {
-  padding: 4px;
+  padding: 8px;
+}
+
+.toolbar-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  background: #f8fafc;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
 }
 
 .empty-state {
@@ -321,152 +390,169 @@ function formatTotalSize(documents) {
   min-height: 350px;
 }
 
-/* 高端精美卡片样式 */
-.premium-card {
+/* 高保真优雅知识库卡片 */
+.base-card {
   position: relative;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(226, 232, 240, 0.8);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+  background: #ffffff;
+  border-radius: 14px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
   overflow: hidden;
-  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-  height: 290px;
-}
-
-.premium-card:hover {
-  transform: translateY(-6px);
-  box-shadow: 0 12px 30px rgba(59, 130, 246, 0.12);
-  border-color: rgba(59, 130, 246, 0.4);
-}
-
-.card-bg-gradient {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 6px;
-  background: linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899);
-}
-
-.card-content {
-  padding: 24px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
   flex-direction: column;
-  height: 100%;
-  box-sizing: border-box;
 }
 
-.card-header {
+.base-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(37, 99, 235, 0.08);
+  border-color: rgba(37, 99, 235, 0.3);
+}
+
+.card-accent-bar {
+  height: 4px;
+  width: 100%;
+  background: linear-gradient(90deg, #2563eb, #8b5cf6);
+}
+
+.card-body {
+  padding: 20px;
   display: flex;
-  align-items: center;
-  gap: 14px;
-  margin-bottom: 14px;
+  flex-direction: column;
+  flex: 1;
 }
 
-.icon-wrapper {
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
-  background: rgba(59, 130, 246, 0.08);
+.card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.icon-box {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: rgba(37, 99, 235, 0.06);
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 
-.title-section {
+.title-box {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
-.base-name {
+.base-title {
   margin: 0;
-  font-size: 1.15rem;
+  font-size: 1.05rem;
   font-weight: 700;
-  color: #1e293b;
+  color: #0f172a;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 180px;
 }
 
-.base-desc {
-  font-size: 0.88rem;
+.status-row {
+  display: flex;
+  align-items: center;
+}
+
+.card-desc {
+  font-size: 0.85rem;
   color: #64748b;
-  line-height: 1.5;
-  margin: 0 0 18px 0;
-  height: 40px;
+  line-height: 1.6;
+  margin: 0 0 16px 0;
+  min-height: 48px;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
 
-/* Bento Grid 统计栏 */
-.stats-bar {
-  display: grid;
-  grid-template-cols: repeat(3, 1fr);
-  background: rgba(241, 245, 249, 0.7);
-  border-radius: 12px;
-  padding: 10px;
-  gap: 6px;
-  margin-bottom: 20px;
+/* 优雅的数据面板统计 (横向平铺) */
+.card-stats {
+  display: flex;
+  background: #f8fafc;
+  border-radius: 10px;
+  padding: 12px 6px;
+  gap: 4px;
+  margin-bottom: 18px;
+  border: 1px solid #f1f5f9;
 }
 
-.stat-item {
+.stat-block {
+  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  border-right: 1px solid rgba(226, 232, 240, 0.8);
+  border-right: 1px solid #e2e8f0;
 }
 
-.stat-item:last-child {
+.stat-block:last-child {
   border-right: none;
 }
 
-.stat-val {
-  font-size: 1.05rem;
+.stat-num {
+  font-size: 0.95rem;
   font-weight: 700;
   color: #1e293b;
 }
 
-.stat-label {
-  font-size: 0.72rem;
+.stat-lbl {
+  font-size: 0.7rem;
   color: #94a3b8;
   margin-top: 2px;
 }
 
-.card-actions {
-  margin-top: auto;
+/* 按钮操作区：完全暴露在底部，没有被遮挡问题 */
+.card-footer {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  margin-top: auto; /* 保证底部对齐 */
+  padding-top: 10px;
+  border-top: 1px dashed #e2e8f0;
 }
 
-/* 黑暗模式支持适配 */
+/* 黑暗模式自适应 */
 @media (prefers-color-scheme: dark) {
-  .premium-card {
-    background: rgba(30, 41, 59, 0.7);
-    border-color: rgba(51, 65, 85, 0.8);
+  .toolbar-section {
+    background: #1e293b;
+    border-color: #334155;
   }
-  .base-name {
+  .base-card {
+    background: #1e293b;
+    border-color: #334155;
+  }
+  .base-card:hover {
+    box-shadow: 0 8px 24px rgba(37, 99, 235, 0.15);
+    border-color: rgba(37, 99, 235, 0.5);
+  }
+  .base-title {
     color: #f8fafc;
   }
-  .base-desc {
+  .card-desc {
     color: #94a3b8;
   }
-  .stats-bar {
-    background: rgba(15, 23, 42, 0.5);
+  .card-stats {
+    background: #0f172a;
+    border-color: #1e293b;
   }
-  .stat-val {
+  .stat-num {
     color: #f8fafc;
   }
-  .stat-label {
+  .stat-lbl {
     color: #64748b;
+  }
+  .card-footer {
+    border-top-color: #334155;
   }
 }
 </style>

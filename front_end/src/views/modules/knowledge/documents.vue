@@ -1,6 +1,6 @@
 <template>
   <div class="documents-container">
-    <div class="header-action-bar">
+    <div v-if="!isModal" class="header-action-bar">
       <n-button secondary @click="goBack">
         <template #icon>
           <n-icon><ArrowBackOutline /></n-icon>
@@ -16,8 +16,8 @@
     <n-tabs type="line" animated size="large">
       <!-- TAB 1: 文档资源管理 -->
       <n-tab-pane name="docs" tab="📂 文档资源列表">
-        <SyCard>
-          <template #header-extra>
+        <SyCard title="文档资源">
+          <template #extra>
             <n-button type="primary" @click="openUpload">
               <template #icon>
                 <n-icon><CloudUploadOutline /></n-icon>
@@ -38,97 +38,101 @@
 
       <!-- TAB 2: 🚀 向量语义检索测试 -->
       <n-tab-pane name="search" tab="🚀 向量语义匹配测试 (AI Playground)">
-        <n-grid :cols="24" :x-gutter="20">
-          <n-grid-item :span="24" :l="10">
-            <div class="search-panel-card">
-              <h3 class="panel-title">向量语义多语种检索</h3>
-              <p class="panel-subtitle">在当前知识库中输入自然语言问题。AI 助手将自动使用 <strong>BAAI/bge-large-zh-v1.5</strong> 高阶向量模型进行 1024 维语义编码，并通过 PostgreSQL <strong>pgvector</strong> 插件进行余弦相似度检索匹配。</p>
-              
-              <n-form label-placement="top">
-                <n-form-item label="请输入匹配问题 / 搜索短语">
-                  <n-input
-                    v-model:value="searchQuery.queryText"
-                    type="textarea"
-                    :rows="4"
-                    placeholder="输入如：请问公司关于请假和年假的规定是什么？"
-                    clearable
+        <div class="search-layout" :class="{ 'in-modal': isModal }">
+          <!-- 左侧：搜索输入区 -->
+          <div class="search-panel-card">
+            <h3 class="panel-title">向量语义检索</h3>
+            <p class="panel-subtitle">
+              使用 <strong>MiniMax embo-01</strong> 向量模型进行 <strong>1536 维</strong>语义编码，
+              通过 PostgreSQL <strong>pgvector</strong> 余弦相似度在知识库中精准召回最相关切片。
+            </p>
+
+            <n-form label-placement="top">
+              <n-form-item label="请输入匹配问题 / 搜索短语">
+                <n-input
+                  v-model:value="searchQuery.queryText"
+                  type="textarea"
+                  :rows="5"
+                  placeholder="例如：员工迟到了怎么处理？"
+                  clearable
+                />
+              </n-form-item>
+              <n-form-item label="召回切片数量 (Top-K)">
+                <div class="slider-wrapper">
+                  <n-slider
+                    v-model:value="searchQuery.limit"
+                    :min="1"
+                    :max="10"
+                    :step="1"
+                    style="flex: 1;"
                   />
-                </n-form-item>
-                <n-form-item label="匹配切片数量限制 (Top-K)">
-                  <div class="slider-wrapper">
-                    <n-slider
-                      v-model:value="searchQuery.limit"
-                      :min="1"
-                      :max="10"
-                      :step="1"
-                      style="flex: 1;"
-                    />
-                    <span class="slider-val">{{ searchQuery.limit }} 个切片</span>
-                  </div>
-                </n-form-item>
-                <n-button
-                  type="primary"
-                  block
-                  size="large"
-                  :loading="searching"
-                  :disabled="!searchQuery.queryText.trim()"
-                  @click="handleSemanticSearch"
-                >
-                  <template #icon>
-                    <n-icon><SearchOutline /></n-icon>
-                  </template>
-                  语义检索匹配
-                </n-button>
-              </n-form>
-            </div>
-          </n-grid-item>
-
-          <n-grid-item :span="24" :l="14">
-            <div class="search-results-section">
-              <h3 class="panel-title">检索结果匹配度排序</h3>
-              
-              <div v-if="searchResults.length === 0" class="no-results-box">
-                <n-empty description="在左侧输入您想测试的问题，开启高精度向量相似度语义检索匹配！" />
-              </div>
-
-              <div v-else class="results-list">
-                <div 
-                  v-for="(chunk, index) in searchResults" 
-                  :key="chunk.id" 
-                  class="chunk-result-card"
-                >
-                  <div class="chunk-header">
-                    <div class="chunk-badge">Rank #{{ index + 1 }}</div>
-                    <div class="source-tag">
-                      <n-icon size="14" style="margin-right: 4px;"><DocumentTextOutline /></n-icon>
-                      {{ chunk.documentTitle }}
-                    </div>
-                  </div>
-                  
-                  <div class="chunk-body-text">
-                    {{ chunk.content }}
-                  </div>
-
-                  <div class="chunk-footer-metric">
-                    <span class="metric-label">语义匹配度得分:</span>
-                    <!-- pgvector 的余弦距离范围为 [0, 2]，其中 0 代表完全相同。 -->
-                    <!-- 我们可以使用一个模拟的百分比相似度: max(0, 1 - distance) * 100% -->
-                    <span class="metric-val">{{ formatSimilarityScore(chunk.cosDistance) }}%</span>
-                  </div>
-                  <n-progress
-                    type="line"
-                    status="success"
-                    :percentage="parseFloat(formatSimilarityScore(chunk.cosDistance))"
-                    :show-indicator="false"
-                    processing
-                    height="8"
-                    style="margin-top: 8px;"
-                  />
+                  <span class="slider-val">{{ searchQuery.limit }} 片</span>
                 </div>
+              </n-form-item>
+              <n-button
+                type="primary"
+                block
+                size="large"
+                :loading="searching"
+                :disabled="!searchQuery.queryText.trim()"
+                @click="handleSemanticSearch"
+              >
+                <template #icon>
+                  <n-icon><SearchOutline /></n-icon>
+                </template>
+                开始语义检索
+              </n-button>
+            </n-form>
+          </div>
+
+          <!-- 右侧：检索结果区 -->
+          <div class="search-results-section">
+            <h3 class="panel-title">
+              检索结果
+              <span v-if="searchResults.length > 0" class="result-count-badge">
+                召回 {{ searchResults.length }} 片
+              </span>
+            </h3>
+
+            <div v-if="searchResults.length === 0" class="no-results-box">
+              <n-empty description="在左侧输入问题，点击「开始语义检索」获取最相关知识片段" />
+            </div>
+
+            <div v-else class="results-list">
+              <div
+                v-for="(chunk, index) in searchResults"
+                :key="chunk.id"
+                class="chunk-result-card"
+              >
+                <div class="chunk-header">
+                  <div class="chunk-badge">Rank #{{ index + 1 }}</div>
+                  <div class="source-tag">
+                    <n-icon size="14" style="margin-right: 4px;"><DocumentTextOutline /></n-icon>
+                    {{ chunk.documentTitle }}
+                  </div>
+                </div>
+
+                <div class="chunk-body-text">
+                  {{ chunk.content }}
+                </div>
+
+                <div class="chunk-footer-metric">
+                  <span class="metric-label">语义匹配度:</span>
+                  <span class="metric-val">{{ formatSimilarityScore(chunk.cosDistance) }}%</span>
+                </div>
+                <n-progress
+                  type="line"
+                  status="success"
+                  :percentage="parseFloat(formatSimilarityScore(chunk.cosDistance))"
+                  :show-indicator="false"
+                  processing
+                  height="6"
+                  style="margin-top: 6px;"
+                />
               </div>
             </div>
-          </n-grid-item>
-        </n-grid>
+          </div>
+        </div>
       </n-tab-pane>
     </n-tabs>
 
@@ -221,7 +225,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, h } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onUnmounted, h } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   NButton,
@@ -268,13 +272,28 @@ import {
 } from '@/api/knowledge'
 import { formatDateTime } from '@/utils'
 
+const props = defineProps({
+  baseId: {
+    type: String,
+    default: ''
+  },
+  baseName: {
+    type: String,
+    default: ''
+  },
+  isModal: {
+    type: Boolean,
+    default: false
+  }
+})
+
 const route = useRoute()
 const router = useRouter()
 const message = useMessage()
 const dialog = useDialog()
 
-const baseId = ref(route.query.baseId || '')
-const baseName = ref(route.query.baseName || '')
+const baseId = computed(() => props.baseId || route.query.baseId || '')
+const baseName = computed(() => props.baseName || route.query.baseName || '')
 
 const loading = ref(false)
 const documents = ref([])
@@ -407,14 +426,53 @@ const columns = [
   }
 ]
 
-onMounted(() => {
+// 持续轮询定时器
+let pollingTimer = null
+
+onMounted(async () => {
   if (baseId.value) {
-    fetchDocuments()
-  } else {
+    await fetchDocuments()
+    // 页面加载时如果有文档正在解析，自动启动轮询
+    const hasParsing = documents.value.some(d => d.status === 'parsing')
+    if (hasParsing) startPolling()
+  } else if (!props.isModal) {
     message.error('无效的知识库参数')
     goBack()
   }
 })
+
+onUnmounted(() => {
+  stopPolling()
+})
+
+// 监听 baseId，在 Modal 模式下如果 baseId 动态变化，能够自动刷新数据
+watch(() => baseId.value, async (newVal) => {
+  if (newVal) {
+    await fetchDocuments()
+    const hasParsing = documents.value.some(d => d.status === 'parsing')
+    if (hasParsing) startPolling()
+    else stopPolling()
+  }
+})
+
+// 启动轮询：每 3 秒检查一次，直到无 parsing 状态文档为止
+function startPolling() {
+  stopPolling()
+  pollingTimer = setInterval(async () => {
+    await fetchDocuments()
+    const hasParsing = documents.value.some(d => d.status === 'parsing')
+    if (!hasParsing) {
+      stopPolling()
+    }
+  }, 3000)
+}
+
+function stopPolling() {
+  if (pollingTimer) {
+    clearInterval(pollingTimer)
+    pollingTimer = null
+  }
+}
 
 async function fetchDocuments() {
   loading.value = true
@@ -454,14 +512,11 @@ async function handleUploadSubmit() {
         content: uploadData.content
       })
       if (res.success) {
-        message.success('文档已开始异步解析，AI 正在构建多维切片向量...')
+        message.success('文档已开始异步解析，AI 正在构建语义向量切片，请稍候...')
         uploadModalVisible.value = false
         fetchDocuments()
-        
-        // 5秒后自动刷新一次，检查解析状态
-        setTimeout(() => {
-          fetchDocuments()
-        }, 5000)
+        // 启动持续轮询，直到解析完成自动停止
+        startPolling()
       }
     } catch (err) {
       message.error(err.message || '文档导入失败')
@@ -581,13 +636,33 @@ function formatTime(val) {
   align-items: center;
 }
 
+/* AI Playground 固定左右布局 */
+.search-layout {
+  display: flex;
+  gap: 20px;
+  align-items: stretch;        /* 左右等高 */
+  height: calc(100vh - 240px); /* 动态计算高度，自适应撑满屏幕剩余空间 */
+  min-height: 600px;           /* 保证最小高度，避免在矮屏幕上内容溢出 */
+}
+
+/* Modal 内展示时的布局高度适配 */
+.search-layout.in-modal {
+  height: 520px;
+  min-height: auto;
+}
+
 /* AI Playground 面板样式 */
 .search-panel-card {
+  flex: 0 0 360px;
+  width: 360px;
   background: white;
   border-radius: 16px;
   padding: 24px;
   border: 1px solid rgba(226, 232, 240, 0.8);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .panel-title {
@@ -595,6 +670,10 @@ function formatTime(val) {
   font-size: 1.15rem;
   font-weight: 700;
   color: #1e293b;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
 }
 
 .panel-subtitle {
@@ -620,14 +699,67 @@ function formatTime(val) {
 
 /* 匹配排序 */
 .search-results-section {
+  flex: 1;
+  min-width: 0;
   background: white;
   border-radius: 16px;
   padding: 24px;
   border: 1px solid rgba(226, 232, 240, 0.8);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02);
-  min-height: 480px;
   display: flex;
   flex-direction: column;
+}
+
+.panel-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.result-count-badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  background: linear-gradient(135deg, #3b82f6, #6366f1);
+  color: white;
+  padding: 3px 10px;
+  border-radius: 20px;
+}
+
+.panel-subtitle {
+  font-size: 0.82rem;
+  color: #64748b;
+  line-height: 1.6;
+  margin-bottom: 24px;
+  flex-shrink: 0;
+}
+
+.slider-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+}
+
+.slider-val {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #3b82f6;
+  min-width: 60px;
+}
+
+/* 匹配排序 */
+.search-results-section {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;               /* 关键：允许 flex 子元素收缩 */
+  background: white;
+  border-radius: 16px;
+  padding: 24px;
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;            /* 防止卡片被内容撑开 */
 }
 
 .no-results-box {
@@ -641,10 +773,33 @@ function formatTime(val) {
 }
 
 .results-list {
+  flex: 1;                     /* 占满右侧卡片剩余高度 */
+  min-height: 0;               /* 关键：没有这个 flex 子元素不会收缩 */
+  overflow-y: auto;            /* 超出内容可滚动 */
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
   margin-top: 16px;
+  padding-right: 6px;
+}
+
+/* 自定义滚动条样式，使其更精致 premium */
+.results-list::-webkit-scrollbar,
+.chunk-body-text::-webkit-scrollbar {
+  width: 6px;
+}
+.results-list::-webkit-scrollbar-track,
+.chunk-body-text::-webkit-scrollbar-track {
+  background: transparent;
+}
+.results-list::-webkit-scrollbar-thumb,
+.chunk-body-text::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.3);
+  border-radius: 3px;
+}
+.results-list::-webkit-scrollbar-thumb:hover,
+.chunk-body-text::-webkit-scrollbar-thumb:hover {
+  background: rgba(156, 163, 175, 0.5);
 }
 
 /* 玻璃态高亮匹配卡片 */
@@ -699,6 +854,8 @@ function formatTime(val) {
   padding: 12px;
   border-radius: 8px;
   border: 1px solid rgba(241, 245, 249, 1);
+  max-height: 250px;
+  overflow-y: auto;
 }
 
 .chunk-footer-metric {

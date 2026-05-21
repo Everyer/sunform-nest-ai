@@ -12,6 +12,7 @@ import * as sharp from 'sharp';
 import { LRUCache } from 'lru-cache';
 import { McpManager, ToolDefinition, ToolUseContext } from './mcp/McpManager';
 import { SkillManager } from './skills/SkillManager';
+import { KnowledgeService } from '../knowledge/knowledge.service';
 
 // ========== 1. 类型定义 ==========
 
@@ -386,9 +387,9 @@ export class AgentService implements OnModuleInit, OnModuleDestroy {
   private readonly configPath: string;
 
   private llmConfig = {
-    apiKey: (process.env.AI_AGENT_API_KEY || '').trim(),
-    baseUrl: (process.env.AI_AGENT_BASE_URL || 'https://api.openai.com/v1').trim(),
-    model: (process.env.AI_AGENT_MODEL || 'gpt-4o').trim(),
+    apiKey: (process.env.AI_AGENT_API_KEY || 'sk-cp-je2E8r2_MASzUY5OO2gEirUluf1JgZQQEuezB0VifE1AMPZ1da9yb4j3EDrDLA131CbyUjcdGkkzkCJvL59UnmSYQDsGImTpjlHdVDjMF7mel1_2-Q_8M5I').trim(),
+    baseUrl: (process.env.AI_AGENT_BASE_URL || 'https://api.minimaxi.com/v1').trim(),
+    model: (process.env.AI_AGENT_MODEL || 'MiniMax-M2.7').trim(),
   };
   private fileManageConfig = {
     url: (process.env.FILE_MANAGE_URL || '').trim(),
@@ -400,7 +401,9 @@ export class AgentService implements OnModuleInit, OnModuleDestroy {
   private saveTimers: Map<string, NodeJS.Timeout> = new Map();
   private forceMockMode = false;
 
-  constructor() {
+  constructor(
+    private readonly knowledgeService: KnowledgeService,
+  ) {
     const baseAgentDir = path.join(process.cwd(), '.agent');
     this.configPath = path.join(baseAgentDir, 'config.json');
     this.historyDir = path.join(baseAgentDir, 'history');
@@ -701,6 +704,32 @@ export class AgentService implements OnModuleInit, OnModuleDestroy {
     // 构建上下文信息
     let messageContent = finalUserMessage;
     const contextParts: string[] = [];
+
+    // ✨ [智能助理-RAG] 自动关联全局企业私有向量知识库，实现无缝问答
+    let matchedChunksText = '';
+    try {
+      const chunks = await this.knowledgeService.searchSimilarChunksGlobal(userMessage, 3);
+      if (chunks.length > 0) {
+        const topChunk = chunks[0];
+        const score = Math.max(0, 1 - (topChunk.cosDistance ?? 1)) * 100;
+        // 如果相似度分值 >= 55%，我们视其为高相关度问答，激活 RAG 增强
+        if (score >= 55) {
+          this.logger.log(`🎯 [智能助理-RAG] 全局向量检索精准命中! 最高相似度: ${score.toFixed(1)}% | 召回数: ${chunks.length}`);
+          const formattedChunks = chunks.map((chunk, idx) => {
+            const chunkScore = Math.max(0, 1 - (chunk.cosDistance ?? 1)) * 100;
+            return `[参考资料 #${idx + 1}] (出处: ${chunk.documentTitle} | 匹配度: ${chunkScore.toFixed(1)}%)\n---\n${chunk.content}`;
+          }).join('\n\n');
+
+          matchedChunksText = `【企业私有知识库参考资料】\n以下是从公司制度、常见问题及内部知识库中精准匹配到的相关条款。\n请必须优先基于此资料做出严谨且专业地回答，如果与大模型自身的通用知识冲突，以该参考资料为准。若参考资料中未提及相关细节，请友好告知用户参考资料中无此规定并尝试按您的通用常识解答。\n\n${formattedChunks}`;
+        }
+      }
+    } catch (e: any) {
+      this.logger.error(`[智能助理-RAG] 全局向量检索失败: ${e.message}`);
+    }
+
+    if (matchedChunksText) {
+      contextParts.push(matchedChunksText);
+    }
 
     if (skill === 'aiFiller') {
       contextParts.push(`【当前页面可用的快捷按钮动作】\n${availableActions?.length ? JSON.stringify(availableActions, null, 2) : '当前无可用快捷动作'}`);

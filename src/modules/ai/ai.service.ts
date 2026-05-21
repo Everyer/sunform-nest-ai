@@ -33,11 +33,16 @@ export class AiService {
     private readonly logger: AiLoggerService,
     private readonly continuationDetector: ContinuationDetectorService,
   ) {
-    // 从环境变量或配置中获取API密钥和基础URL
-    this.siliconflowApiKey = this.configService.get<string>('SILICONFLOW_API_KEY') ||
-      'sk-rrjepjyxesmokrgnqrzjikqegxftuuqcllczhwsrpmvtsypu';
-    this.siliconflowBaseUrl = this.configService.get<string>('SILICONFLOW_BASE_URL') ||
-      'https://api.siliconflow.cn/v1';
+    // 优先读取 AI_AGENT_API_KEY 作为全局统一的 AI 密钥，兼容旧版 SILICONFLOW_API_KEY
+    this.siliconflowApiKey = this.configService.get<string>('AI_AGENT_API_KEY') ||
+      this.configService.get<string>('SILICONFLOW_API_KEY') ||
+      'sk-cp-je2E8r2_MASzUY5OO2gEirUluf1JgZQQEuezB0VifE1AMPZ1da9yb4j3EDrDLA131CbyUjcdGkkzkCJvL59UnmSYQDsGImTpjlHdVDjMF7mel1_2-Q_8M5I';
+
+    // 优先读取 AI_AGENT_BASE_URL 并自动剥离 /chat/completions 后缀，规范化为 Base URL
+    const rawBaseUrl = this.configService.get<string>('AI_AGENT_BASE_URL') ||
+      this.configService.get<string>('SILICONFLOW_BASE_URL') ||
+      'https://api.minimaxi.com/v1';
+    this.siliconflowBaseUrl = rawBaseUrl.replace(/\/chat\/completions\/?$/, '').replace(/\/$/, '');
 
     // Coze API 配置
     this.cozeApiKey = this.configService.get<string>('COZE_API_KEY') || 'pat_a7d9C2KTexEjWNmfdt22nQEZUqhkX1vd28We5b6W642hWrW9Awo7HtbupRlUJ5Uv';
@@ -69,9 +74,9 @@ export class AiService {
 
       // 获取优化信息用于日志
       const managementInfo = messageManager.getManagementInfo(messagesWithRules, optimizedMessages);
-      // 构建请求参数
+      const defaultModel = this.configService.get<string>('AI_AGENT_MODEL') || 'MiniMax-M2.7';
       const requestData = {
-        model: model || 'deepseek-ai/DeepSeek-V3',
+        model: model || defaultModel,
         messages: optimizedMessages,
         stream: true,
         max_tokens: streamChatDto.max_tokens || 10000,
@@ -505,9 +510,9 @@ export class AiService {
       const optimizedMessages = await messageManager.manageMessages(conversationMessages, systemMessage);
       const managementInfo = messageManager.getManagementInfo(messagesWithRules, optimizedMessages);
 
-      // 构建请求参数
+      const defaultModel = this.configService.get<string>('AI_AGENT_MODEL') || 'MiniMax-M2.7';
       const requestData = {
-        model: model || 'Qwen/QwQ-32B',
+        model: model || defaultModel,
         messages: optimizedMessages,
         stream: false,
         max_tokens: completionChatDto.max_tokens || 4000,
