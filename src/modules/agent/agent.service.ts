@@ -126,6 +126,8 @@ export class ReadTool extends BaseTool {
   isConcurrencySafe() { return true; }
 
   async execute(input: { file_path: string; offset?: number; limit?: number }, context: ToolUseContext) {
+    return { success: false, error: '安全限制：当前系统已开启安全保护，禁止 AI 智能助手读取、写入或修改任何本地项目文件，也禁止执行任何终端命令，以保障项目代码安全。' };
+    /*
     const fullPath = resolveAndValidatePath(context.cwd, input.file_path);
     let content: string;
     try {
@@ -143,6 +145,7 @@ export class ReadTool extends BaseTool {
       context.readFileState.set(fullPath, { content: finalContent, timestamp: (await fs.stat(fullPath)).mtimeMs, offset: input.offset, limit: input.limit });
     } catch {}
     return { success: true, content: finalContent, filePath: input.file_path, lines: selectedLines.length, totalLines: lines.length, truncated: input.limit !== undefined && lines.length > input.limit };
+    */
   }
 }
 
@@ -165,6 +168,8 @@ export class EditTool extends BaseTool {
   inputSchema = { parse: (input: any) => ({ file_path: input.file_path as string, old_string: input.old_string as string, new_string: input.new_string as string, replace_all: input.replace_all as boolean | undefined }) };
 
   async execute(input: { file_path: string; old_string: string; new_string: string; replace_all?: boolean }, context: ToolUseContext) {
+    return { success: false, error: '安全限制：当前系统已开启安全保护，禁止 AI 智能助手读取、写入或修改任何本地项目文件，也禁止执行任何终端命令，以保障项目代码安全。' };
+    /*
     const fullPath = resolveAndValidatePath(context.cwd, input.file_path);
     let fileContent: string;
     try {
@@ -184,6 +189,7 @@ export class EditTool extends BaseTool {
       context.readFileState.set(fullPath, { content: updatedFile, timestamp: newStats.mtimeMs });
     } catch {}
     return { success: true, filePath: path.basename(fullPath), replacedCount: input.replace_all ? matches : 1 };
+    */
   }
 
   private findActualString(fileContent: string, searchString: string): string | null {
@@ -218,6 +224,8 @@ export class WriteTool extends BaseTool {
   inputSchema = { parse: (input: any) => ({ file_path: input.file_path as string, content: input.content as string }) };
 
   async execute(input: { file_path: string; content: string }, context: ToolUseContext) {
+    return { success: false, error: '安全限制：当前系统已开启安全保护，禁止 AI 智能助手读取、写入或修改任何本地项目文件，也禁止执行任何终端命令，以保障项目代码安全。' };
+    /*
     const fullPath = resolveAndValidatePath(context.cwd, input.file_path);
     await fs.mkdir(path.dirname(fullPath), { recursive: true });
     await fs.writeFile(fullPath, input.content, 'utf-8');
@@ -226,6 +234,7 @@ export class WriteTool extends BaseTool {
       context.readFileState.set(fullPath, { content: input.content, timestamp: stats.mtimeMs });
     } catch {}
     return { success: true, filePath: input.file_path, bytesWritten: Buffer.byteLength(input.content, 'utf-8') };
+    */
   }
 }
 
@@ -240,6 +249,8 @@ export class BashTool extends BaseTool {
   isConcurrencySafe() { return false; }
 
   async execute(input: { command: string; timeout?: number }, context: ToolUseContext): Promise<any> {
+    return { success: false, error: '安全限制：当前系统已开启安全保护，禁止 AI 智能助手读取、写入或修改任何本地项目文件，也禁止执行任何终端命令，以保障项目代码安全。' };
+    /*
     return new Promise((resolve) => {
       const { command, timeout = 30000 } = input;
       if (context.abortController.signal.aborted) { resolve({ success: false, error: '命令被用户中断' }); return; }
@@ -255,6 +266,7 @@ export class BashTool extends BaseTool {
       child.on('error', (err: Error) => { clearTimeout(timer); resolve({ success: false, error: err.message }); });
       context.abortController.signal.addEventListener('abort', () => child.kill('SIGKILL'));
     });
+    */
   }
 }
 
@@ -269,6 +281,8 @@ export class GrepTool extends BaseTool {
   isConcurrencySafe() { return true; }
 
   async execute(input: { pattern: string; file_path?: string; case_insensitive?: boolean }, context: ToolUseContext) {
+    return { success: false, error: '安全限制：当前系统已开启安全保护，禁止 AI 智能助手读取、写入或修改任何本地项目文件，也禁止执行任何终端命令，以保障项目代码安全。' };
+    /*
     try {
       if (input.file_path) {
         const fullPath = resolveAndValidatePath(context.cwd, input.file_path);
@@ -279,6 +293,7 @@ export class GrepTool extends BaseTool {
       }
       return { success: true, results: [], totalMatches: 0 };
     } catch (e: any) { return { success: false, error: e.message }; }
+    */
   }
 
   private searchInLines(lines: string[], pattern: string, caseInsensitive?: boolean): { line: number; content: string }[] {
@@ -299,11 +314,14 @@ export class GlobTool extends BaseTool {
   isConcurrencySafe() { return true; }
 
   async execute(input: { pattern: string; cwd?: string }, context: ToolUseContext) {
+    return { success: false, error: '安全限制：当前系统已开启安全保护，禁止 AI 智能助手读取、写入或修改任何本地项目文件，也禁止执行任何终端命令，以保障项目代码安全。' };
+    /*
     const targetDir = input.cwd ? resolveAndValidatePath(context.cwd, input.cwd) : context.cwd;
     try {
       const files = await this.glob(input.pattern, targetDir);
       return { success: true, files, count: files.length };
     } catch (e: any) { return { success: false, error: e.message }; }
+    */
   }
 
   private async glob(pattern: string, dir: string): Promise<string[]> {
@@ -335,8 +353,11 @@ export class EnvTool extends BaseTool {
   inputSchema = { parse: (input: any) => ({ command: input.command as string }) };
 
   async execute(input: { command: string }, context: ToolUseContext) {
+    return { success: false, error: '安全限制：当前系统已开启安全保护，禁止 AI 智能助手读取、写入或修改任何本地项目文件，也禁止执行任何终端命令，以保障项目代码安全。' };
+    /*
     context.addSetupCommand(input.command);
     return { success: true, message: `环境指令已持久化：${input.command}`, currentSetupCommands: context.setupCommands };
+    */
   }
 }
 
@@ -669,21 +690,10 @@ export class AgentService implements OnModuleInit, OnModuleDestroy {
             if (this.fileManageConfig.url) {
               try { publicUrl = await this.uploadFileToService(filePath, a.name); } catch {}
             }
-            if (publicUrl) {
-              const hasNonStandardPort = /:[0-9]+/.test(publicUrl) && !publicUrl.includes(':80') && !publicUrl.includes(':443');
-              let base64 = '';
-              if (hasNonStandardPort) {
-                const buffer = await fs.readFile(filePath);
-                const compressed = await sharp(buffer).resize(1024, 1024, { fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 60 }).toBuffer();
-                base64 = `data:image/jpeg;base64,${compressed.toString('base64')}`;
-              }
-              imageAttachments.push({ name: a.name, path: a.path, content: base64, url: publicUrl, isImage: true });
-            } else {
-              const buffer = await fs.readFile(filePath);
-              const compressed = await sharp(buffer).resize(1024, 1024, { fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 60 }).toBuffer();
-              const base64 = `data:image/jpeg;base64,${compressed.toString('base64')}`;
-              imageAttachments.push({ name: a.name, path: a.path, content: base64, isImage: true });
-            }
+            const buffer = await fs.readFile(filePath);
+            const compressed = await sharp(buffer).resize(1024, 1024, { fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 60 }).toBuffer();
+            const base64 = `data:image/jpeg;base64,${compressed.toString('base64')}`;
+            imageAttachments.push({ name: a.name, path: a.path, content: base64, url: publicUrl || undefined, isImage: true });
           } else {
             const fileContent = await fs.readFile(filePath, 'utf-8');
             textAttachments.push(`【文件附件: ${a.name}】\n内容:\n---\n${fileContent}\n---`);
@@ -692,7 +702,10 @@ export class AgentService implements OnModuleInit, OnModuleDestroy {
       }
       if (textAttachments.length > 0 || imageAttachments.length > 0) {
         if (textAttachments.length > 0) finalUserMessage = `${textAttachments.join('\n\n')}\n\n${userMessage}`;
-        if (imageAttachments.length > 0) finalUserMessage = `用户上传了 ${imageAttachments.length} 张图片。\n\n${finalUserMessage}`;
+        if (imageAttachments.length > 0) {
+          const imgDetails = imageAttachments.map((img, idx) => `[图片 #${idx + 1}] 名称: ${img.name} | 临时路径: ${img.path} ${img.url ? `| URL: ${img.url}` : ''}`).join('\n');
+          finalUserMessage = `【用户上传了 ${imageAttachments.length} 张图片，元数据如下：】\n${imgDetails}\n*(提示：如果你是非多模态大模型，请使用可用的分析图片 MCP 工具，并传入图片临时路径 (path) 或 URL 以解析图中的表单数据。)*\n\n${finalUserMessage}`;
+        }
       }
     }
 
@@ -845,10 +858,8 @@ export class AgentService implements OnModuleInit, OnModuleDestroy {
       const skills = userMsg ? await this.skillManager.getActiveSkills(userMsg.content) : [];
       const systemPrompt = this.buildSystemPrompt(session.skill, skills.join('\n\n'));
 
-      // 构建工具列表（内置工具 + MCP 工具）
-      const builtInTools = this.toolRegistry.getAll();
+      // 构建工具列表（安全考量：内置敏感的本地文件与终端工具彻底不传给 LLM）
       const allTools = [
-        ...builtInTools.map(t => ({ type: 'function' as const, function: { name: t.name, description: t.description, parameters: t.parameters } })),
         ...this.mcpTools.map(t => ({ type: 'function' as const, function: { name: t.name.replace(/:/g, '__'), description: t.description, parameters: t.parameters } })),
       ];
 
@@ -920,16 +931,16 @@ export class AgentService implements OnModuleInit, OnModuleDestroy {
         if (m.attachments?.length) {
           for (const att of m.attachments) {
             if (att.isImage) {
-              if (att.url && !( /:[0-9]+/.test(att.url) && !att.url.includes(':80') && !att.url.includes(':443'))) {
-                contentParts.push({ type: 'image_url', image_url: { url: att.url } });
-              } else if (att.content) {
-                const imageUrl = att.content.startsWith('data:') ? att.content : `data:image/png;base64,${att.content}`;
+              if (att.content) {
+                const imageUrl = att.content.startsWith('data:') ? att.content : `data:image/jpeg;base64,${att.content}`;
                 contentParts.push({ type: 'image_url', image_url: { url: imageUrl, detail: 'high' } });
+              } else if (att.url) {
+                contentParts.push({ type: 'image_url', image_url: { url: att.url } });
               }
             }
           }
         }
-        msgs.push(contentParts.length > 1 ? { role: m.role, content: contentParts } : { role: m.role, content: m.content || '' });
+        msgs.push(contentParts.length > 0 ? { role: m.role, content: contentParts } : { role: m.role, content: m.content || '' });
       }
     }
     return msgs;
@@ -951,17 +962,17 @@ ${skillsContent ? `\n**【当前激活的特定领域技能 (Skills)】**：\n${
 5. **元数据盲区**：展示的 HTML 预览内容可能包含 \`data-v-line\` 或 \`data-v-file\` 等内部追踪标记。你必须将这些标记视为**完全不可见**的。**绝对严禁**在你的任何言语回复中提及这些标记。
 6. **纯净源码原则**：你输出的代码块或对文件的修改，严禁带入任何形式的开发环境临时标记。
 7. **禁止运行服务**：**严禁**自主启动项目预览或长期运行的服务程序（如 \`npm run dev\`, \`vite\` 等）。
-8. **多模态视觉处理规范**：当用户上传图片时，图片像素数据已直接嵌入。你**必须直接观察并描述图片内容**，不需要调用任何外部工具来看图片。
+8. **视觉与图片分析规范**：当用户上传图片时：
+   - 如果你拥有多模态（VLM）直观视觉能力，请直接观察、阅读并解析图片内容。
+   - 如果你是非多模态大模型，请直接使用你可用的“分析图片”与“视觉解析”相关的 MCP 工具，将图片的临时路径 (path) 或 URL 传入该工具以获取解析结果。
 
-**【内置工具】**：
-你有以下内置工具可以直接使用：
-- **Read**：读取文件内容（支持 offset/limit）
-- **Edit**：使用字符串匹配编辑文件
-- **Write**：写入或创建新文件
-- **Bash**：执行 Bash 命令
-- **Grep**：在文件中搜索文本模式
-- **Glob**：列出目录中的文件
-- **Env**：持久化环境变量
+**【内置安全限制】**：
+你当前运行在**严格受限的安全沙箱环境**中。
+为了系统运行与代码安全，当前已**完全禁用了内置的文件读写与终端命令工具**。
+当你需要向用户提供新设计的表单、修改代码或进行页面操控时：
+- 请**直接在你的文本回复中，以 Markdown 格式的完整 \`vue\` 代码块**输出页面源码。
+- 或者你可以按照技能规范，在回复中输出 **ReplaceCode** 工具调用补丁以替换特定代码片段，前端将自动应用这些修改。
+- 严禁尝试调用任何内置的文件读写工具（如 Read/Write/Edit）或终端工具（如 Bash），系统会 100% 拒绝任何此类工具调用。
 
 核心原则：
 1. **自主行动**：不要询问"我是否应该这样做？"。直接调用工具执行。

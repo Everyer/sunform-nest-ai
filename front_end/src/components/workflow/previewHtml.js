@@ -12,9 +12,19 @@ export function buildPreviewHtml(templateCode, extractTemplate, extractScript, f
 
   let iframeCode = ''
   if (rawScript) {
-    var cleanScr = rawScript.replace(/^export\s+default\s+/, '').trim();
+    // 过滤所有的 import 语句
+    var cleanScr = rawScript.replace(/import\s+[\s\S]*?from\s+['"].*?['"];?/g, '').trim();
+    cleanScr = cleanScr.replace(/^export\s+default\s+/, '').trim();
     if (cleanScr.endsWith(';')) cleanScr = cleanScr.slice(0, -1);
-    iframeCode = ';(function(){var userOpts=(function(){return (' + cleanScr + ')})();'
+    
+    iframeCode = ';(function(){'
+      + 'var userOpts={};'
+      + 'try{'
+      + '  var finalScr = ' + JSON.stringify(cleanScr) + ';'
+      // 容错：将 components: { ... } 替换为 components: {}，防止 import 剥离后在 components 引用抛出 ReferenceError
+      + '  finalScr = finalScr.replace(/components\\s*:\\s*\\{[\\s\\S]*?\\}/g, "components: {}");'
+      + '  userOpts = new Function("return (" + finalScr + ")")();'
+      + '}catch(e){console.error("[previewHtml] Script parse error:", e);}'
       + 'var App={data(){var base={formData:{},formRules:{},locale:null,dateLocale:null};'
       + 'try{var extraData=typeof userOpts.data==="function"?userOpts.data():{};Object.assign(base,extraData)}catch(e){}'
       + 'return base},methods:userOpts&&userOpts.methods||{},computed:userOpts&&userOpts.computed||{},'

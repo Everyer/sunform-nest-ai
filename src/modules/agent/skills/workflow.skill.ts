@@ -24,8 +24,11 @@ export const skill = {
 - 请勿包含提交/取消按钮，壳子已提供
 - n-date-picker 的 value 格式使用时间戳（number）
 
-## <script> 块必须（每次输出都带）
-每次生成的代码必须包含 <template> 和 <script> 两部分：
+## <script> 块规范（每次输出都带，必须严格遵守）
+1. 每次生成的代码必须包含且仅包含 <template> 和 <script> 两部分（可选包含 <style>）。
+2. **严禁在 <script> 中写入任何 'import' 语句！** 严禁导入任何外部组件、图标库（如 '@vicons/ionicons5'、'@vicons'）或其他依赖包。页面预览环境无法解析这些包！
+3. **若需实现任何图标装饰效果，请直接使用原生的 HTML '<svg>' 标签或 HTML 字符。** 严禁引入任何第三方图标组件！
+4. **'components' 属性必须保持为空或不写。** 绝对不能注册任何从未全局注册的外部组件。
 
 <script> 格式：
 export default {
