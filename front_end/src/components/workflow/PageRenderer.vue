@@ -49,18 +49,9 @@
     </div>
 
     <!-- Flow chart modal -->
-    <n-modal v-model:show="showFlowChart" title="流程图" preset="card" style="width: 680px; max-width: 90vw;">
-      <div v-if="flowData?.nodes?.length" class="flow-chart-view">
-        <div v-for="(node, idx) in displayNodes" :key="node.id" class="fc-node-wrapper">
-          <div class="fc-node" :class="'fc-' + (node.type || 'approve')">
-            <div class="fc-node-type">{{ nodeTypeLabel(node.type) }}</div>
-            <div class="fc-node-name">{{ node.name }}</div>
-          </div>
-          <div v-if="idx < displayNodes.length - 1" class="fc-arrow">
-            <svg width="24" height="24" viewBox="0 0 24 24"><path d="M12 4v14m0 0l-5-5m5 5l5-5" stroke="#94a3b8" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            <span v-if="getEdgeLabel(node.id)" class="fc-edge-label">{{ getEdgeLabel(node.id) }}</span>
-          </div>
-        </div>
+    <n-modal v-model:show="showFlowChart" title="流程图" preset="card" style="width: 720px; max-width: 95vw;">
+      <div v-if="treeData" class="flow-chart-view overflow-x-auto p-4 flex justify-center">
+        <FlowChartTree :node="treeData" />
       </div>
       <n-empty v-else description="暂无流程数据" />
     </n-modal>
@@ -82,6 +73,8 @@ import naive, { zhCN, dateZhCN } from 'naive-ui'
 import { GitNetworkOutline, ListOutline } from '@vicons/ionicons5'
 import { startInstance, approveInstance, withdrawInstance } from '@/api/workflow/instance'
 import { getTaskDetail } from '@/api/workflow/task'
+import FlowChartTree from './FlowChartTree.vue'
+import WfField from './WfField.vue'
 
 // ============ Props ============
 
@@ -144,44 +137,66 @@ const statusTagType = computed(() => {
   return 'default'
 })
 
-const displayNodes = computed(() => {
+const treeData = computed(() => {
   const data = props.flowData
-  if (!data?.nodes?.length) return []
+  if (!data?.nodes?.length) return null
+
   const nodeMap = {}
-  data.nodes.forEach(n => { nodeMap[n.id] = n })
-  // Find start node and follow edges to build order
-  const start = data.nodes.find(n => n.type === 'start' || !data.edges?.some(e => e.target === n.id || e.targetNodeId === n.id))
-  if (!start) return data.nodes
-  const ordered = [start]
+  data.nodes.forEach(n => {
+    nodeMap[n.id] = {
+      id: n.id,
+      name: n.name,
+      type: n.type,
+      children: [],
+    }
+  })
+
   const edgeKey = data.edges?.[0]?.sourceNodeId ? 'sourceNodeId' : 'source'
   const targetKey = data.edges?.[0]?.targetNodeId ? 'targetNodeId' : 'target'
-  const edgeMap = {}
+
+  const outgoingMap = {}
   ;(data.edges || []).forEach(e => {
-    if (!edgeMap[e[edgeKey]]) edgeMap[e[edgeKey]] = []
-    edgeMap[e[edgeKey]].push(e)
+    const src = e[edgeKey]
+    if (!outgoingMap[src]) outgoingMap[src] = []
+    outgoingMap[src].push(e)
   })
-  let current = start.id
-  while (edgeMap[current]?.length) {
-    // Pick first edge (or condition branch if multiple)
-    const edge = edgeMap[current][0]
-    const next = nodeMap[edge[targetKey]]
-    if (!next || ordered.includes(next)) break
-    ordered.push(next)
-    current = edge[targetKey]
+
+  const startNode = data.nodes.find(n => n.type === 'start' || !data.edges?.some(e => e[targetKey] === n.id))
+  if (!startNode) return null
+
+  const visited = new Set()
+
+  function buildSubtree(nodeId, edgeLabel = '') {
+    if (visited.has(nodeId)) {
+      const node = nodeMap[nodeId]
+      return {
+        id: nodeId + '_ref',
+        name: (node?.name || '') + ' (循环)',
+        type: node?.type || 'end',
+        edgeLabel,
+        children: [],
+      }
+    }
+
+    visited.add(nodeId)
+    const nodeObj = { ...nodeMap[nodeId], edgeLabel }
+
+    const outEdges = outgoingMap[nodeId] || []
+    nodeObj.children = outEdges.map(edge => {
+      const targetId = edge[targetKey]
+      let label = edge.label || edge.condition || ''
+      if (typeof label === 'object' && label !== null) {
+        label = label.isDefault ? '其他' : (label.rules ? '条件分支' : '')
+      }
+      return buildSubtree(targetId, label)
+    }).filter(child => child !== null)
+
+    visited.delete(nodeId)
+    return nodeObj
   }
-  return ordered
+
+  return buildSubtree(startNode.id)
 })
-
-function nodeTypeLabel(type) {
-  return { start: '发起', approve: '审批', condition: '条件', end: '结束' }[type] || type
-}
-
-function getEdgeLabel(nodeId) {
-  if (!props.flowData?.edges) return ''
-  const edgeKey = props.flowData.edges[0]?.sourceNodeId ? 'sourceNodeId' : 'source'
-  const edge = props.flowData.edges.find(e => e[edgeKey] === nodeId)
-  return edge?.label || edge?.condition || ''
-}
 
 // ============ Lifecycle ============
 
@@ -259,7 +274,32 @@ function removeInjectedStyle() {
   }
 }
 
-function mountForm() {
+function initTailwindRuntime() {
+  if (window.tailwind) return Promise.resolve()
+  return new Promise((resolve) => {
+    window.tailwind = {
+      corePlugins: { preflight: false },
+      theme: {
+        extend: {
+          boxShadow: {
+            premium: "0 10px 40px -10px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.03)",
+            massive: "0 20px 60px -15px rgba(0,0,0,0.1), 0 4px 6px rgba(0,0,0,0.05)"
+          }
+        }
+      }
+    }
+    const script = document.createElement('script')
+    script.src = 'https://cdn.tailwindcss.com'
+    script.onload = () => resolve()
+    script.onerror = () => {
+      console.warn('[PageRenderer] Failed to load Tailwind CSS CDN.')
+      resolve()
+    }
+    document.head.appendChild(script)
+  })
+}
+
+async function mountForm() {
   unmountForm()
   loading.value = true
   error.value = ''
@@ -269,7 +309,16 @@ function mountForm() {
     return
   }
 
-  const innerHtml = extractTemplate(props.template)
+  await initTailwindRuntime()
+
+  let templateText = props.template || ''
+  // Hot patch: seamless backward compatibility with legacy multi-line formatted non-compilable if statement in @click, turning it into a valid Vue 3 expression
+  templateText = templateText.replace(
+    /@click="\s*if\s*\(\s*!formData\.([a-zA-Z0-9_]+)\s*\)\s*(?:\{\s*)?formData\.\1\s*=\s*\[\];?\s*(?:\}\s*)?formData\.\1\.push\(([\s\S]*?)\);?\s*"/g,
+    '@click="(formData.$1 = formData.$1 || []).push($2)"'
+  )
+
+  const innerHtml = extractTemplate(templateText)
   if (!innerHtml) {
     loading.value = false
     return
@@ -319,6 +368,9 @@ function mountForm() {
 
     // Register naive-ui globally for the dynamic app
     formApp.use(naive)
+
+    // Register WfField globally for the dynamic app
+    formApp.component('WfField', WfField)
 
     // Inject workflow context
     formApp.config.globalProperties.$workflow = { ...props.workflowContext }
@@ -387,8 +439,18 @@ function reload() {
 
 function updateFormData() {
   if (!formVm.value || !props.workflowContext?.formData) return
-  const newData = props.workflowContext.formData
-  Object.assign(formVm.value.formData, JSON.parse(JSON.stringify(newData)))
+  const newData = JSON.parse(JSON.stringify(props.workflowContext.formData))
+  
+  // Safely merge properties to avoid destroying reactive arrays or introducing undefined states
+  Object.keys(formVm.value.formData).forEach(key => {
+    if (newData[key] !== undefined && newData[key] !== null) {
+      formVm.value.formData[key] = newData[key]
+    } else {
+      if (Array.isArray(formVm.value.formData[key])) {
+        formVm.value.formData[key] = []
+      }
+    }
+  })
 }
 
 // ============ Workflow Operations ============

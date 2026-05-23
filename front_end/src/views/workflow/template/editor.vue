@@ -80,13 +80,45 @@
             </div>
           </div>
           <div class="step1-right">
-            <div class="flex items-center justify-between px-4 py-2 bg-white border-b border-gray-100 sticky top-0">
-              <span class="text-sm font-semibold text-slate-700">表单字段（{{ formData.fields.length }}）</span>
+            <div class="flex items-center justify-between px-4 py-2 bg-white border-b border-gray-100 sticky top-0 z-10 shadow-sm">
+              <span class="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                表单字段（{{ formData.fields.length }}）
+                <n-button
+                  v-if="formData.fields.length > 0"
+                  size="tiny"
+                  type="warning"
+                  secondary
+                  :loading="translating"
+                  @click="batchTranslateAllKeysWithAi"
+                  class="ml-2 hover:scale-[1.02] transition-transform duration-200"
+                >
+                  <template #icon>
+                    <span class="text-xs">⚡</span>
+                  </template>
+                  AI 一键命名所有标识
+                </n-button>
+              </span>
               <n-button size="tiny" type="primary" @click="addField">添加字段</n-button>
             </div>
             <div class="fields-grid p-4">
-              <div v-for="(field, idx) in formData.fields" :key="idx" class="field-card">
+              <div 
+                v-for="(field, idx) in formData.fields" 
+                :key="idx" 
+                class="field-card"
+                draggable="true"
+                @dragstart="handleDragStart($event, idx)"
+                @dragover="handleDragOver($event, idx)"
+                @dragleave="handleDragLeave($event, idx)"
+                @drop="handleDrop($event, idx)"
+                @dragend="handleDragEnd"
+                :class="{ 'drag-active': dragIndex === idx, 'drag-over': dragOverIndex === idx && dragIndex !== idx }"
+              >
                 <div class="field-header">
+                  <div class="drag-handle mr-1 cursor-move">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                      <path d="M8.5 6a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm0 6a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm0 6a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm7-12a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm0 6a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm0 6a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z"/>
+                    </svg>
+                  </div>
                   <span class="field-index">{{ idx + 1 }}</span>
                   <span class="field-key-label">{{ field.label || field.key || '新字段' }}</span>
                   <n-tag size="tiny">{{ fieldTypeLabel(field.type) }}</n-tag>
@@ -95,7 +127,15 @@
                 </div>
                 <div class="field-body">
                   <div class="field-row">
-                    <div class="field-col"><label class="field-label">标识</label><n-input v-model:value="field.key" size="small" placeholder="leaveType" /></div>
+                    <div class="field-col">
+                      <label class="field-label flex items-center justify-between">
+                        <span>标识</span>
+                        <n-button size="tiny" type="primary" quaternary class="text-[10px] h-4 py-0 px-1 font-normal" style="line-height: 1" @click="translateKeyWithAi(field)">
+                          ⚡ AI 命名
+                        </n-button>
+                      </label>
+                      <n-input v-model:value="field.key" size="small" placeholder="leaveType" />
+                    </div>
                     <div class="field-col"><label class="field-label">名称</label><n-input v-model:value="field.label" size="small" placeholder="请假类型" /></div>
                   </div>
                   <div class="field-row">
@@ -114,9 +154,34 @@
                     <div class="flex items-center justify-between mb-2"><label class="field-label">选项</label><n-button size="tiny" secondary @click="addOption(idx)">添加</n-button></div>
                     <div class="space-y-2">
                       <div v-for="(opt, oi) in field.options" :key="oi" class="flex items-center gap-3">
-                        <n-input v-model:value="opt.label" size="small" placeholder="显示名" style="flex:1" />
+                        <n-input v-model:value="opt.label" @input="opt.value = opt.label" size="small" placeholder="显示名" style="flex:1" />
                         <n-input v-model:value="opt.value" size="small" placeholder="值" style="flex:1" />
                         <n-button size="tiny" text @click="removeOption(idx, oi)"><template #icon><n-icon size="14"><CloseOutline /></n-icon></template></n-button>
+                      </div>
+                    </div>
+                  </div>
+                  <div v-if="field.type === 'subtable'" class="field-options">
+                    <div class="flex items-center justify-between mb-2">
+                      <label class="field-label font-bold text-slate-700">明细表格列（{{ field.columns?.length || 0 }}）</label>
+                      <n-button size="tiny" type="primary" secondary @click="addSubColumn(idx)">添加列</n-button>
+                    </div>
+                    <div class="space-y-3 p-2 bg-slate-50 border border-slate-200 rounded">
+                      <div v-for="(col, ci) in field.columns" :key="ci" class="flex items-center gap-2.5 bg-white p-2.5 rounded-lg border border-slate-100 shadow-sm w-full">
+                        <div class="flex items-center gap-1 flex-[1.4] min-w-[170px]">
+                          <n-input v-model:value="col.key" size="tiny" placeholder="列标识" style="flex: 1" />
+                          <n-button size="tiny" type="primary" quaternary class="text-[10px] h-6 px-1.5 font-normal hover:bg-blue-50 transition-colors flex-shrink-0" @click="translateColKeyWithAi(col)">⚡ AI</n-button>
+                        </div>
+                        <n-input v-model:value="col.label" size="tiny" placeholder="列名称(label)" class="flex-1 min-w-[100px]" />
+                        <n-select v-model:value="col.type" :options="subColumnTypeOptions" size="tiny" placeholder="类型" class="w-[110px] flex-shrink-0" />
+                        <div v-if="col.type === 'select'" class="flex-[1.5] min-w-[120px]">
+                          <n-input v-model:value="col.optionsText" size="tiny" placeholder="选项(用/隔开)" />
+                        </div>
+                        <n-button size="tiny" type="error" text @click="removeSubColumn(idx, ci)" class="flex-shrink-0">
+                          <template #icon><n-icon size="14"><CloseOutline /></n-icon></template>
+                        </n-button>
+                      </div>
+                      <div v-if="!field.columns || field.columns.length === 0" class="text-center text-slate-400 text-[10px] py-2">
+                        暂无列定义，点击上方「添加列」进行设置
                       </div>
                     </div>
                   </div>
@@ -139,7 +204,7 @@
             </div>
           </div>
           <div class="editor-canvas">
-            <FlowCanvas ref="canvasRef" @node-select="onNodeSelect" />
+            <FlowCanvas ref="canvasRef" :fields="formData.fields" @node-select="onNodeSelect" />
           </div>
           <div v-if="selectedNode" class="editor-sidebar">
             <div class="sidebar-section">
@@ -195,6 +260,7 @@ import FlowCanvas from '@/components/workflow/FlowCanvas.vue'
 import PageDesigner from '@/components/workflow/PageDesigner.vue'
 import { getTemplateDetail, createTemplate, updateTemplate, publishTemplate, deactivateTemplate } from '@/api/workflow/template'
 import { getUserList } from '@/api/user'
+import request from '@/api/index'
 import { getRoleList } from '@/api/role'
 
 const props = defineProps({
@@ -210,6 +276,7 @@ const showBasic = ref(true)
 const saving = ref(false)
 const publishing = ref(false)
 const loading = ref(false)
+const translating = ref(false)
 const selectedNode = ref(null)
 const designedTemplate = ref('')
 const savedNodes = ref([])
@@ -253,6 +320,23 @@ const fieldTypeOptions = [
   { label: '单选框', value: 'radio' },
   { label: '多选框', value: 'checkbox' },
   { label: '开关', value: 'switch' },
+  { label: '人员选择', value: 'user' },
+  { label: '附件上传', value: 'upload' },
+  { label: '明细子表 (SubTable)', value: 'subtable' },
+]
+
+const subColumnTypeOptions = [
+  { label: '单行文本', value: 'input' },
+  { label: '多行文本', value: 'textarea' },
+  { label: '数字', value: 'number' },
+  { label: '下拉选择', value: 'select' },
+  { label: '日期', value: 'date' },
+  { label: '日期时间', value: 'datetime' },
+  { label: '单选框', value: 'radio' },
+  { label: '多选框', value: 'checkbox' },
+  { label: '开关', value: 'switch' },
+  { label: '人员选择', value: 'user' },
+  { label: '附件上传', value: 'upload' },
 ]
 
 const assigneeTypeOptions = [
@@ -277,9 +361,271 @@ const rejectStrategyOptions = [
 const userOptions = ref([])
 const roleOptions = ref([])
 
+// Generate 4-character short unique ID for keys to avoid extremely long field and col IDs
+function generateShortId() {
+  return Math.random().toString(36).substring(2, 6)
+}
+
+// Drag & drop sort states & handlers
+const dragIndex = ref(null)
+const dragOverIndex = ref(null)
+
+function handleDragStart(e, idx) {
+  dragIndex.value = idx
+  e.dataTransfer.effectAllowed = 'move'
+}
+
+function handleDragOver(e, idx) {
+  e.preventDefault()
+  if (dragIndex.value !== null && dragIndex.value !== idx) {
+    dragOverIndex.value = idx
+  }
+}
+
+function handleDragLeave(e, idx) {
+  if (dragOverIndex.value === idx) {
+    dragOverIndex.value = null
+  }
+}
+
+function handleDrop(e, idx) {
+  e.preventDefault()
+  if (dragIndex.value === null || dragIndex.value === idx) {
+    dragOverIndex.value = null
+    return
+  }
+  const list = [...formData.fields]
+  const draggedItem = list[dragIndex.value]
+  list.splice(dragIndex.value, 1)
+  list.splice(idx, 0, draggedItem)
+  formData.fields = list
+  
+  dragIndex.value = null
+  dragOverIndex.value = null
+}
+
+function handleDragEnd() {
+  dragIndex.value = null
+  dragOverIndex.value = null
+}
+
+async function translateKeyWithAi(field) {
+  if (!field.label) {
+    window.$message?.warning('请先输入“名称”（例如：报销单号）')
+    return
+  }
+  const label = field.label
+  const loadingMsg = window.$message?.loading('AI 正在语义识别命名...', { duration: 0 })
+  try {
+    const prompt = `你是一个代码变量命名助手。将中文的业务表单字段名称翻译并转换为规范的小驼峰（camelCase）英文变量标识。仅输出翻译后的英文变量标识，绝对不要有任何解释、标点、Markdown标记或多余的换行符。\n输入：请假天数\n输出：leaveDays\n输入：报销金额\n输出：reimbursementAmount\n输入：${label}\n输出：`
+    
+    const res = await request.post('/ai/completions', {
+      ruleType: 'programming',
+      messages: [
+        { role: 'user', content: prompt }
+      ]
+    })
+    
+    loadingMsg?.destroy()
+    if (res && res.choices && res.choices[0] && res.choices[0].message) {
+      let key = res.choices[0].message.content.trim()
+      key = key.replace(/<think>[\s\S]*?<\/think>/g, '').trim()
+      key = key.replace(/[^a-zA-Z0-9_]/g, '')
+      if (key) {
+        field.key = 'field_' + key
+        window.$message?.success(`AI 语义命名成功: field_${key}`)
+      } else {
+        window.$message?.error('AI 返回格式有误，请重试')
+      }
+    } else {
+      window.$message?.error('AI 服务无响应，请重试')
+    }
+  } catch (e) {
+    loadingMsg?.destroy()
+    console.error('AI Translate failed:', e)
+    window.$message?.error('AI 命名服务暂时不可用')
+  }
+}
+
+async function translateColKeyWithAi(col) {
+  if (!col.label) {
+    window.$message?.warning('请先输入“列名称”')
+    return
+  }
+  const label = col.label
+  const loadingMsg = window.$message?.loading('AI 正在语义识别命名...', { duration: 0 })
+  try {
+    const prompt = `你是一个代码变量命名助手。将中文的业务表单字段名称翻译并转换为规范的小驼峰（camelCase）英文变量标识。仅输出翻译后的英文变量标识，绝对不要有任何解释、标点、Markdown标记或多余的换行符。\n输入：费用类别\n输出：expenseType\n输入：报销金额\n输出：amount\n输入：${label}\n输出：`
+    
+    const res = await request.post('/ai/completions', {
+      ruleType: 'programming',
+      messages: [
+        { role: 'user', content: prompt }
+      ]
+    })
+    
+    loadingMsg?.destroy()
+    if (res && res.choices && res.choices[0] && res.choices[0].message) {
+      let key = res.choices[0].message.content.trim()
+      key = key.replace(/<think>[\s\S]*?<\/think>/g, '').trim()
+      key = key.replace(/[^a-zA-Z0-9_]/g, '')
+      if (key) {
+        col.key = 'col_' + key
+        window.$message?.success(`AI 语义命名成功: col_${key}`)
+      } else {
+        window.$message?.error('AI 返回格式有误，请重试')
+      }
+    } else {
+      window.$message?.error('AI 服务无响应，请重试')
+    }
+  } catch (e) {
+    loadingMsg?.destroy()
+    console.error('AI Translate failed:', e)
+    window.$message?.error('AI 命名服务暂时不可用')
+  }
+}
+
+async function batchTranslateAllKeysWithAi() {
+  if (formData.fields.length === 0) {
+    window.$message?.warning('请先添加表单字段')
+    return
+  }
+
+  // 检查是否所有字段都有 Label
+  const missingLabel = formData.fields.some(f => !f.label)
+  if (missingLabel) {
+    window.$message?.warning('请先为所有字段填写“名称”（包括子表的“列名称”），以便 AI 进行语义识别')
+    return
+  }
+
+  // 检查明细表的列是否都填了 Label
+  for (const f of formData.fields) {
+    if (f.type === 'subtable') {
+      if (!f.columns || f.columns.length === 0) continue
+      if (f.columns.some(c => !c.label)) {
+        window.$message?.warning('请先填写子表明细列的“列名称”')
+        return
+      }
+    }
+  }
+
+  const loadingMsg = window.$message?.loading('AI 正在一键批量智能命名 Key...', { duration: 0 })
+  translating.value = true
+
+  try {
+    // 构造发送给 AI 的数据
+    const inputData = formData.fields.map(f => {
+      const item = { type: 'field', label: f.label }
+      if (f.type === 'subtable' && f.columns && f.columns.length > 0) {
+        item.columns = f.columns.map(c => c.label)
+      }
+      return item
+    })
+
+    const prompt = `你是一个代码变量命名助手。将中文的表单字段名称翻译并转换为规范的小驼峰（camelCase）英文变量标识。
+输入是一个包含字段名称（label）和特定属性的JSON数组。
+你需要根据名称和上下文，生成合理、地道、简短的英文小驼峰标识。
+对于主表字段，生成的键名请加上 'field_' 前缀（例如'field_leaveDays'）。
+对于明细子表列，生成的键名请加上 'col_' 前缀（例如'col_amount'）。
+
+输入数据：
+${JSON.stringify(inputData, null, 2)}
+
+请精确返回相同结构的JSON数组，并在其中补充生成好的键名 \`key\`，以及子表列的键名映射 \`columns\` 属性。
+请不要返回任何非JSON格式的解释或聊天内容，直接返回JSON格式即可。
+
+返回格式示例：
+[
+  { "type": "field", "label": "请假人", "key": "field_applicant" },
+  { "type": "field", "label": "报销金额", "key": "field_reimbursementAmount" },
+  { "type": "field", "label": "报销明细", "key": "field_reimbursementDetails", "columns": { "明细名称": "col_itemName", "明细金额": "col_amount" } }
+]`
+
+    const res = await request.post('/ai/completions', {
+      ruleType: 'programming',
+      messages: [
+        { role: 'user', content: prompt }
+      ]
+    })
+
+    loadingMsg?.destroy()
+
+    if (res && res.choices && res.choices[0] && res.choices[0].message) {
+      let content = res.choices[0].message.content.trim()
+      // 移除 <think>...</think> 思考块
+      content = content.replace(/<think>[\s\S]*?<\/think>/g, '').trim()
+      // 清理 Markdown 代码块
+      if (content.startsWith('```json')) {
+        content = content.replace(/^```json/, '').replace(/```$/, '').trim()
+      } else if (content.startsWith('```')) {
+        content = content.replace(/^```/, '').replace(/```$/, '').trim()
+      }
+
+      const responseData = JSON.parse(content)
+      if (Array.isArray(responseData)) {
+        // 开始批量替换
+        responseData.forEach((item, index) => {
+          const field = formData.fields[index]
+          if (field && field.label === item.label) {
+            if (item.key) {
+              let cleanKey = item.key.trim()
+              cleanKey = cleanKey.replace(/^(field_|col_)/i, '')
+              cleanKey = cleanKey.replace(/[^a-zA-Z0-9_]/g, '')
+              if (cleanKey) {
+                field.key = 'field_' + cleanKey
+              }
+            }
+            if (field.type === 'subtable' && field.columns && item.columns) {
+              field.columns.forEach(col => {
+                const targetColKey = item.columns[col.label]
+                if (targetColKey) {
+                  let cleanColKey = targetColKey.trim()
+                  cleanColKey = cleanColKey.replace(/^(field_|col_)/i, '')
+                  cleanColKey = cleanColKey.replace(/[^a-zA-Z0-9_]/g, '')
+                  if (cleanColKey) {
+                    col.key = 'col_' + cleanColKey
+                  }
+                }
+              })
+            }
+          }
+        })
+        window.$message?.success('AI 批量命名成功，已自动同步更新所有标识 Key！')
+      } else {
+        window.$message?.error('AI 返回数据格式解析失败，请重试')
+      }
+    } else {
+      window.$message?.error('AI 服务无响应，请重试')
+    }
+  } catch (e) {
+    loadingMsg?.destroy()
+    console.error('Batch AI translation failed:', e)
+    const errText = e.response?.data?.message || e.message || 'AI 命名服务暂时不可用'
+    window.$message?.error(`AI 批量一键命名失败: \${errText}`)
+  } finally {
+    translating.value = false
+  }
+}
+
 function fieldTypeLabel(type) {
-  const m = { input: '文本', textarea: '多行', number: '数字', select: '下拉', date: '日期', datetime: '日期时间', radio: '单选', checkbox: '多选', switch: '开关' }
+  const m = { input: '文本', textarea: '多行', number: '数字', select: '下拉', date: '日期', datetime: '日期时间', radio: '单选', checkbox: '多选', switch: '开关', user: '人员选择', upload: '附件上传', subtable: '明细子表' }
   return m[type] || type
+}
+
+function addSubColumn(fieldIdx) {
+  const f = formData.fields[fieldIdx];
+  if (!f.columns) f.columns = [];
+  const colKey = 'col_' + generateShortId();
+  f.columns.push({
+    key: colKey,
+    label: '',
+    type: 'input',
+    optionsText: ''
+  });
+}
+
+function removeSubColumn(fieldIdx, colIdx) {
+  formData.fields[fieldIdx]?.columns?.splice(colIdx, 1);
 }
 
 function fieldsKey() {
@@ -295,7 +641,7 @@ function commitFields() {
 }
 
 function addField() {
-  const key = 'field_' + Date.now()
+  const key = 'field_' + generateShortId()
   formData.fields.push({ key, label: '', type: 'input', required: false, placeholder: '', defaultValue: null, options: [], min: null, max: null, rows: 4 })
 }
 
@@ -468,7 +814,7 @@ function buildPayload() {
     sourceNodeId: e.sourceNodeId || e.source, 
     targetNodeId: e.targetNodeId || e.target,
     label: e.label || e.data?.label || '', 
-    condition: e.condition || e.data?.conditionExpr || null,
+    condition: e.data?.condition || e.condition || e.data?.conditionExpr || null,
   }))
 
   const nodePermissions = []
@@ -553,12 +899,59 @@ function generateFormFromFields() {
 
   const fieldComponents = fields.map(f => genFieldHtml(f)).join('\n\n')
 
-  const dataProps = fields.map(f => `        ${f.key}: ${genDefaultValue(f)}`).join(',\n')
+  // Generate basic data variables
+  const dataPropList = fields.map(f => `        ${f.key}: ${genDefaultValue(f)}`);
+  
+  // Inject sub-table derived virtual aggregation properties to formData
+  fields.filter(f => f.type === 'subtable').forEach(f => {
+    dataPropList.push(`        ${f.key}_count: 0`);
+    (f.columns || []).forEach(c => {
+      if (c.type === 'number' || c.type === 'input') {
+        dataPropList.push(`        ${f.key}_sum_${c.key}: 0`);
+        dataPropList.push(`        ${f.key}_max_${c.key}: 0`);
+      }
+    });
+  });
+
+  const dataProps = dataPropList.join(',\n')
+
   const rules = fields.filter(f => f.required).map(f => `        ${f.key}: [{ required: true, message: '${f.placeholder || '请填写' + (f.label || f.key)}', trigger: '${f.type === 'select' || f.type === 'date' || f.type === 'datetime' || f.type === 'radio' ? 'change' : 'blur'}' }]`).join(',\n')
-  const optionsData = fields.filter(f => f.type === 'select' || f.type === 'radio' || f.type === 'checkbox').map(f => {
+  
+  const optionsList = fields.filter(f => f.type === 'select' || f.type === 'radio' || f.type === 'checkbox').map(f => {
     const opts = (f.options || []).map(o => `        { label: '${o.label}', value: '${o.value}' }`)
     return `      ${f.key}Options: [\n${opts.join(',\n')}\n      ]`
-  }).join(',\n')
+  })
+
+  fields.filter(f => f.type === 'subtable').forEach(f => {
+    const cols = (f.columns || []).map(c => `        { key: '${c.key}', label: '${c.label || c.key}', type: '${c.type || 'input'}', optionsText: '${c.optionsText || ''}' }`)
+    optionsList.push(`      ${f.key}Columns: [\n${cols.join(',\n')}\n      ]`)
+  })
+
+  const optionsData = optionsList.join(',\n')
+
+  // Generate watchers for subtable aggregates
+  const watchersList = [];
+  fields.filter(f => f.type === 'subtable').forEach(f => {
+    const calcLines = [];
+    calcLines.push(`      const list = val || [];`);
+    calcLines.push(`      this.formData.${f.key}_count = list.length;`);
+    (f.columns || []).forEach(c => {
+      if (c.type === 'number' || c.type === 'input') {
+        calcLines.push(`      this.formData.${f.key}_sum_${c.key} = list.reduce((sum, item) => sum + (Number(item.${c.key}) || 0), 0);`);
+        calcLines.push(`      this.formData.${f.key}_max_${c.key} = list.length ? Math.max(...list.map(item => Number(item.${c.key}) || 0)) : 0;`);
+      }
+    });
+
+    watchersList.push(`    'formData.${f.key}': {
+      handler(val) {
+${calcLines.join('\n')}
+      },
+      deep: true,
+      immediate: true
+    }`);
+  });
+
+  const watchers = watchersList.join(',\n')
 
   const scriptClose = '<' + '/script>'
   designedTemplate.value = `<template>
@@ -586,51 +979,40 @@ ${optionsData}
   },
   methods: {},
   computed: {},
-  watch: {},
+  watch: {
+${watchers}
+  },
 }
 ${scriptClose}`
 }
 
 function genFieldHtml(f) {
-  const common = `label="${f.label || f.key}" path="${f.key}"`
-  const ph = f.placeholder ? ` placeholder="${f.placeholder}"` : ''
-  const readonlyBind = `:disabled="$workflow?.nodePermissions?.${f.key} === 'readonly'"`
-  const hideBind = `v-if="$workflow?.nodePermissions?.${f.key} !== 'hidden'"`
-
-  let input = ''
-  switch (f.type) {
-    case 'input':
-      input = `<n-input v-model:value="formData.${f.key}"${ph} ${readonlyBind} />`
-      break
-    case 'textarea':
-      input = `<n-input v-model:value="formData.${f.key}" type="textarea" :rows="${f.rows || 4}"${ph} ${readonlyBind} />`
-      break
-    case 'number':
-      input = `<n-input-number v-model:value="formData.${f.key}"${f.min ? ' :min="' + f.min + '"' : ''}${f.max ? ' :max="' + f.max + '"' : ''} style="width:100%"${ph} ${readonlyBind} />`
-      break
-    case 'select':
-      input = `<n-select v-model:value="formData.${f.key}" :options="${f.key}Options"${ph} ${readonlyBind} />`
-      break
-    case 'radio':
-      input = `<n-radio-group v-model:value="formData.${f.key}" ${readonlyBind}>\n              <n-space>\n                <n-radio v-for="o in ${f.key}Options" :key="o.value" :value="o.value" :disabled="$workflow?.nodePermissions?.${f.key} === 'readonly'">{{ o.label }}</n-radio>\n              </n-space>\n            </n-radio-group>`
-      break
-    case 'checkbox':
-      input = `<n-checkbox-group v-model:value="formData.${f.key}" ${readonlyBind}>\n              <n-space>\n                <n-checkbox v-for="o in ${f.key}Options" :key="o.value" :value="o.value" :disabled="$workflow?.nodePermissions?.${f.key} === 'readonly'">{{ o.label }}</n-checkbox>\n              </n-space>\n            </n-checkbox-group>`
-      break
-    case 'date':
-      input = `<n-date-picker v-model:value="formData.${f.key}" type="date" style="width:100%"${ph} ${readonlyBind} />`
-      break
-    case 'datetime':
-      input = `<n-date-picker v-model:value="formData.${f.key}" type="datetime" style="width:100%"${ph} ${readonlyBind} />`
-      break
-    case 'switch':
-      input = `<n-switch v-model:value="formData.${f.key}" ${readonlyBind} />`
-      break
-    default:
-      input = `<n-input v-model:value="formData.${f.key}"${ph} ${readonlyBind} />`
+  let attrs = []
+  attrs.push(`label="${f.label || f.key}"`)
+  attrs.push(`path="${f.key}"`)
+  attrs.push(`type="${f.type || 'input'}"`)
+  attrs.push(`v-model:value="formData.${f.key}"`)
+  
+  if (f.placeholder) {
+    attrs.push(`placeholder="${f.placeholder}"`)
   }
-
-  return `        <n-form-item ${common} ${hideBind}>\n          ${input}\n        </n-form-item>`
+  if (f.rows) {
+    attrs.push(`:rows="${f.rows}"`)
+  }
+  if (f.min !== undefined && f.min !== null) {
+    attrs.push(`:min="${f.min}"`)
+  }
+  if (f.max !== undefined && f.max !== null) {
+    attrs.push(`:max="${f.max}"`)
+  }
+  if (f.type === 'select' || f.type === 'radio' || f.type === 'checkbox') {
+    attrs.push(`:options="${f.key}Options"`)
+  }
+  if (f.type === 'subtable') {
+    attrs.push(`:columns="${f.key}Columns"`)
+  }
+  
+  return `        <wf-field ${attrs.join(' ')} />`
 }
 
 function genDefaultValue(f) {
@@ -638,6 +1020,7 @@ function genDefaultValue(f) {
     if (typeof f.defaultValue === 'string') return `'${f.defaultValue}'`
     return f.defaultValue
   }
+  if (f.type === 'subtable') return '[]'
   if (f.type === 'number') return 'null'
   if (f.type === 'switch') return 'false'
   if (f.type === 'checkbox') return '[]'
@@ -727,7 +1110,29 @@ function genDefaultValue(f) {
 
 .fields-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 
-.field-card { border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; background: #fafbfc; }
+.field-card { border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; background: #fafbfc; transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s; }
+.field-card.drag-active {
+  opacity: 0.4;
+  border-color: #3b82f6;
+  border-style: dashed;
+  transform: scale(0.98);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.08);
+}
+.field-card.drag-over {
+  border-color: #3b82f6;
+  background: #eff6ff;
+  transform: translateY(-2px) scale(1.01);
+  box-shadow: 0 8px 24px rgba(59, 130, 246, 0.15);
+}
+.drag-handle {
+  display: flex;
+  align-items: center;
+  color: #94a3b8;
+  transition: color 0.15s;
+}
+.drag-handle:hover {
+  color: #475569;
+}
 
 .field-header {
   display: flex; align-items: center; gap: 6px;

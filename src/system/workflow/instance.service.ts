@@ -68,10 +68,12 @@ export class InstanceService {
         try {
           await existing.update({ status: 'running' } as any, { transaction });
 
-          const firstEdge = template.edges.find(e => e.sourceNodeId === startNode.id);
-          if (!firstEdge) throw new BusinessException('模板缺少流程连线');
-
-          await this.createNextNode(existing.id, firstEdge.targetNodeId, template, transaction);
+          const nextNodeId = await this.getNextExecutableNodeId(startNode.id, template, existing.id, transaction);
+          if (nextNodeId) {
+            await this.createNextNode(existing.id, nextNodeId, template, transaction);
+          } else {
+            await existing.update({ status: 'approved', finishedAt: new Date(), currentNodeIds: [] } as any, { transaction });
+          }
           await transaction.commit();
         } catch (e) {
           await transaction.rollback();
@@ -140,11 +142,12 @@ export class InstanceService {
         dataVersion: 1,
       } as any, { transaction });
 
-      // 推进到第一个审批节点
-      const firstEdge = template.edges.find(e => e.sourceNodeId === startNode.id);
-      if (!firstEdge) throw new BusinessException('模板缺少流程连线');
-
-      await this.createNextNode(instance.id, firstEdge.targetNodeId, template, transaction);
+      const nextNodeId = await this.getNextExecutableNodeId(startNode.id, template, instance.id, transaction);
+      if (nextNodeId) {
+        await this.createNextNode(instance.id, nextNodeId, template, transaction);
+      } else {
+        await instance.update({ status: 'approved', finishedAt: new Date(), currentNodeIds: [] } as any, { transaction });
+      }
 
       await transaction.commit();
       return instance;
@@ -212,9 +215,10 @@ export class InstanceService {
       });
 
       if (!template) throw new BusinessException('模板不存在');
-      const edge = template.edges?.find(e => e.sourceNodeId === node.templateNodeId);
-      if (edge) {
-        await this.createNextNode(instance.id, edge.targetNodeId, template, transaction);
+
+      const nextNodeId = await this.getNextExecutableNodeId(node.templateNodeId, template, instance.id, transaction);
+      if (nextNodeId) {
+        await this.createNextNode(instance.id, nextNodeId, template, transaction);
       } else {
         // 最后一个节点，流程结束
         await instance.update({ status: 'approved', finishedAt: new Date(), currentNodeIds: [] } as any, { transaction });
@@ -364,5 +368,136 @@ export class InstanceService {
     result.nodePermissions = permissions;
     result.dataSnapshots = dataSnapshots;
     return result;
+  }
+
+  private evaluateCondition(condition: any, formData: any): boolean {
+    if (!condition) return true;
+    
+    if (typeof condition === 'string') {
+      if (condition === 'else' || condition === 'other') {
+        return false;
+      }
+      const match = condition.match(/^\s*([a-zA-Z0-9_]+)\s*([>=<!]+|contains|not_contains)\s*(.+)$/);
+      if (match) {
+        const field = match[1];
+        const operator = match[2];
+        const value = match[3].trim().replace(/^['"]|['"]$/g, '');
+        const formValue = formData[field];
+        return this.compareValues(formValue, operator, value);
+      }
+      return false;
+    }
+
+    if (condition.isDefault) return false;
+
+    const { logicalOp, rules } = condition;
+    if (!rules || !Array.isArray(rules) || rules.length === 0) return true;
+
+    const results = rules.map(rule => {
+      const { field, operator, value } = rule;
+      const formValue = formData[field];
+      return this.compareValues(formValue, operator, value);
+    });
+
+    if (logicalOp === 'or') {
+      return results.some(r => r);
+    } else {
+      return results.every(r => r);
+    }
+  }
+
+  private compareValues(formValue: any, operator: string, targetValue: any): boolean {
+    const numForm = Number(formValue);
+    const numTarget = Number(targetValue);
+    const isNumeric = !isNaN(numForm) && !isNaN(numTarget) && formValue !== '' && targetValue !== '' && formValue !== null && targetValue !== null;
+
+    switch (operator) {
+      case '==':
+        return formValue == targetValue;
+      case '!=':
+        return formValue != targetValue;
+      case '>':
+        return isNumeric ? numForm > numTarget : String(formValue) > String(targetValue);
+      case '>=':
+        return isNumeric ? numForm >= numTarget : String(formValue) >= String(targetValue);
+      case '<':
+        return isNumeric ? numForm < numTarget : String(formValue) < String(targetValue);
+      case '<=':
+        return isNumeric ? numForm <= numTarget : String(formValue) <= String(targetValue);
+      case 'contains':
+        return typeof formValue === 'string' && formValue.includes(targetValue);
+      case 'not_contains':
+        return typeof formValue === 'string' && !formValue.includes(targetValue);
+      case 'empty':
+        return formValue === undefined || formValue === null || formValue === '';
+      case 'not_empty':
+        return formValue !== undefined && formValue !== null && formValue !== '';
+      default:
+        return false;
+    }
+  }
+
+  private async getNextExecutableNodeId(
+    sourceNodeId: string,
+    template: FlowTemplate,
+    instanceId: string,
+    transaction?: any,
+  ): Promise<string | null> {
+    const outgoingEdges = template.edges.filter(e => e.sourceNodeId === sourceNodeId);
+    if (outgoingEdges.length === 0) return null;
+
+    if (outgoingEdges.length === 1) {
+      const nextNode = template.nodes.find(n => n.id === outgoingEdges[0].targetNodeId);
+      if (!nextNode) return null;
+      if (nextNode.type === 'condition') {
+        return this.getNextExecutableNodeId(nextNode.id, template, instanceId, transaction);
+      }
+      return nextNode.id;
+    }
+
+    const lastData = await this.instanceDataModel.findOne({
+      where: { instanceId },
+      order: [['dataVersion', 'DESC']],
+      transaction,
+    });
+    const formData = lastData?.data || {};
+
+    const sortedEdges = [...outgoingEdges].sort((a, b) => {
+      const aCond = typeof a.condition === 'string' ? { isDefault: a.condition === 'else' || a.condition === 'other' } : a.condition;
+      const bCond = typeof b.condition === 'string' ? { isDefault: b.condition === 'else' || b.condition === 'other' } : b.condition;
+      const aIsDefault = aCond?.isDefault || false;
+      const bIsDefault = bCond?.isDefault || false;
+      return (aIsDefault ? 1 : 0) - (bIsDefault ? 1 : 0);
+    });
+
+    let matchedTargetNodeId: string | null = null;
+    let defaultTargetNodeId: string | null = null;
+
+    for (const edge of sortedEdges) {
+      const cond = typeof edge.condition === 'string' ? { isDefault: edge.condition === 'else' || edge.condition === 'other' } : edge.condition;
+      const isDefault = cond?.isDefault || false;
+
+      if (isDefault) {
+        defaultTargetNodeId = edge.targetNodeId;
+        continue;
+      }
+
+      if (this.evaluateCondition(edge.condition, formData)) {
+        matchedTargetNodeId = edge.targetNodeId;
+        break;
+      }
+    }
+
+    const targetId = matchedTargetNodeId || defaultTargetNodeId;
+    if (!targetId) {
+      throw new BusinessException('无法流转流程：分支条件未匹配，且未设置默认流转分支');
+    }
+
+    const targetNode = template.nodes.find(n => n.id === targetId);
+    if (targetNode && targetNode.type === 'condition') {
+      return this.getNextExecutableNodeId(targetNode.id, template, instanceId, transaction);
+    }
+
+    return targetId;
   }
 }

@@ -856,7 +856,7 @@ export class AgentService implements OnModuleInit, OnModuleDestroy {
       // 重新获取 Skills
       const userMsg = [...session.messages].reverse().find(m => m.role === 'user');
       const skills = userMsg ? await this.skillManager.getActiveSkills(userMsg.content) : [];
-      const systemPrompt = this.buildSystemPrompt(session.skill, skills.join('\n\n'));
+      const systemPrompt = this.buildSystemPrompt(session, skills.join('\n\n'));
 
       // 构建工具列表（安全考量：内置敏感的本地文件与终端工具彻底不传给 LLM）
       const allTools = [
@@ -948,10 +948,43 @@ export class AgentService implements OnModuleInit, OnModuleDestroy {
 
   // ========== 构建系统提示 ==========
 
-  private buildSystemPrompt(skill?: string, skillsContent?: string): string {
+  private buildSystemPrompt(session: AgentSession, skillsContent?: string): string {
     const cwd = process.cwd();
+    const skill = session.skill;
+
+    // 构建 MCP 工具引导
+    let mcpToolsGuide = '';
+    if (this.mcpTools.length > 0) {
+      mcpToolsGuide = `\n**【当前已连接且可用的云端 MCP 工具】**：\n` + 
+        this.mcpTools.map(t => `- \`${t.name.replace(/:/g, '__')}\`: ${t.description}`).join('\n') + '\n';
+    }
+
+    // 检查是否有图片分析的强力引导
+    let imageGuidedPrompt = '';
+    const lastUserMsg = [...session.messages].reverse().find(m => m.role === 'user');
+    const hasImage = lastUserMsg && (
+      (typeof lastUserMsg.content === 'string' && (lastUserMsg.content.includes('临时路径:') || lastUserMsg.content.includes('[图片 #'))) ||
+      (Array.isArray(lastUserMsg.content) && lastUserMsg.content.some((part: any) => part.type === 'image_url' || (part.text && (part.text.includes('临时路径:') || part.text.includes('[图片 #')))))
+    );
+
+    if (hasImage && this.mcpTools.length > 0) {
+      const imageTools = this.mcpTools.filter(t => {
+        const n = t.name.toLowerCase();
+        const d = (t.description || '').toLowerCase();
+        return n.includes('image') || n.includes('img') || n.includes('picture') || 
+               n.includes('vision') || n.includes('visual') || n.includes('analyze') || 
+               n.includes('parse') || n.includes('minimax');
+      });
+      
+      if (imageTools.length > 0) {
+        imageGuidedPrompt = `\n> [!IMPORTANT]\n> **【检测到用户上传了图片且你为非多模态大模型】**：\n> 系统已检测到配置了专门用于图片分析的 MCP 工具。请**务必立即调用**以下工具来对上传的图片进行视觉解析与数据提取（请将图片路径 path 或 URL 传入对应的参数），严禁自行胡乱猜测：\n` +
+          imageTools.map(t => `> - \`${t.name.replace(/:/g, '__')}\`：${t.description}`).join('\n') + '\n';
+      }
+    }
     const basePrompt = `你是 Claude，一个极其高效且自主的 AI 编程助手。
 ${skillsContent ? `\n**【当前激活的特定领域技能 (Skills)】**：\n${skillsContent}\n` : ''}
+${mcpToolsGuide}
+${imageGuidedPrompt}
 你的目标是：以最少的对话次数，最直接地完成用户的代码修改、分析和执行任务。
 
 **【空间位置核心规范】**：
@@ -1189,7 +1222,7 @@ ${skillsContent ? `\n**【当前激活的特定领域技能 (Skills)】**：\n${
       this.logger.log(`安全压缩: 保留 ${messagesToKeep.length} 条, 总结 ${messagesToSummarize.length} 条`);
 
       const msgs: any[] = [
-        { role: 'system', content: this.buildSystemPrompt(session.skill, skillsContent) },
+        { role: 'system', content: this.buildSystemPrompt(session, skillsContent) },
         ...messagesToSummarize.map(m => {
           if (m.role === 'assistant') {
             let content = m.content || '';

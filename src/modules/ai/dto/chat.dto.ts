@@ -47,7 +47,7 @@ export class StreamChatDto {
   })
   @IsOptional()
   @IsString()
-  model?: string = 'deepseek-ai/DeepSeek-V3';
+  model?: string;
 
   @ApiPropertyOptional({
     description: '规则类型',
@@ -141,7 +141,7 @@ export class CompletionChatDto {
   })
   @IsOptional()
   @IsString()
-  model?: string = 'Qwen/QwQ-32B';
+  model?: string;
 
   @ApiPropertyOptional({
     description: '规则类型',
