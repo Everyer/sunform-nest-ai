@@ -6,7 +6,7 @@
 import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { EventEmitter } from 'events';
 import * as fs from 'fs/promises';
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
 import * as path from 'path';
 import * as sharp from 'sharp';
 import { LRUCache } from 'lru-cache';
@@ -1025,6 +1025,22 @@ ${imageGuidedPrompt}
   }
 
   private loadSkillPromptSync(skill: string): string | null {
+    // 1. 优先以文本形式直接读取 src/ 目录下的原始 TS 源文件，实现“直拿原件”，彻底杜绝编译偏差与热重载延时
+    try {
+      const srcPath = path.join(process.cwd(), 'src/modules/agent/skills', `${skill}.skill.ts`);
+      if (existsSync(srcPath)) {
+        const rawContent = readFileSync(srcPath, 'utf-8');
+        // 使用正则表达式抓取 content: `...` 包裹的系统提示词内容
+        const match = rawContent.match(/content:\s*`([\s\S]*?)`/);
+        if (match) {
+          return match[1];
+        }
+      }
+    } catch (e: any) {
+      this.logger.error(`直接读取源文件技能提示词失败: ${e.message}`);
+    }
+
+    // 2. 兜底方案：使用传统的 require 机制读取编译后的 JS/TS 模块
     try {
       const fullPath = path.join(this.skillsDir, `${skill}.skill.js`);
       delete require.cache[require.resolve(fullPath)];

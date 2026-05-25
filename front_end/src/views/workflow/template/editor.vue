@@ -221,10 +221,22 @@
             </div>
             <n-divider />
             <div class="sidebar-section">
-              <div class="sidebar-title">字段权限</div>
+              <div class="sidebar-title flex items-center justify-between mb-2">
+                <span>字段权限</span>
+                <div v-if="formData.fields.length > 0" class="flex items-center gap-1">
+                  <n-button size="tiny" quaternary type="primary" class="text-[10px] px-1 h-5" @click="batchSetAllPerms('editable')">全编辑</n-button>
+                  <n-button size="tiny" quaternary type="warning" class="text-[10px] px-1 h-5" @click="batchSetAllPerms('readonly')">全只读</n-button>
+                  <n-button size="tiny" quaternary type="default" class="text-[10px] px-1 h-5" @click="batchSetAllPerms('hidden')">全隐藏</n-button>
+                </div>
+              </div>
               <div v-if="formData.fields.length === 0" class="text-slate-400 text-xs">暂无字段，请先到第一步定义字段</div>
               <div v-else class="perm-table">
-                <div class="perm-header"><span class="perm-col-field">字段</span><span class="perm-col">可编辑</span><span class="perm-col">只读</span><span class="perm-col">隐藏</span></div>
+                <div class="perm-header">
+                  <span class="perm-col-field">字段</span>
+                  <span class="perm-col cursor-pointer hover:text-blue-500 transition-colors" @click="batchSetAllPerms('editable')">可编辑</span>
+                  <span class="perm-col cursor-pointer hover:text-amber-500 transition-colors" @click="batchSetAllPerms('readonly')">只读</span>
+                  <span class="perm-col cursor-pointer hover:text-slate-500 transition-colors" @click="batchSetAllPerms('hidden')">隐藏</span>
+                </div>
                 <div v-for="field in formData.fields" :key="field.key" class="perm-row" :class="{ 'perm-row-active': getFieldPerm(field.key) === 'editable' }">
                   <span class="perm-col-field">{{ field.label || field.key }}</span>
                   <span class="perm-col" @click="setFieldPerm(field.key, 'editable')"><span class="perm-radio" :class="{ checked: getFieldPerm(field.key) === 'editable' }" /></span>
@@ -661,7 +673,18 @@ function removeOption(fieldIdx, optIdx) {
 function getFieldPerm(fieldKey) {
   const nodeId = selectedNode.value?.id
   if (!nodeId) return 'editable'
-  return fieldPermissions[nodeId]?.[fieldKey] || 'editable'
+  
+  if (fieldPermissions[nodeId] && fieldPermissions[nodeId][fieldKey]) {
+    return fieldPermissions[nodeId][fieldKey]
+  }
+  
+  // Fallback to default by node type
+  const nodeType = selectedNode.value?.type || selectedNode.value?.data?.nodeType
+  if (nodeType === 'approve' || nodeType === 'end') {
+    return 'readonly'
+  }
+  
+  return 'editable'
 }
 
 function setFieldPerm(fieldKey, val) {
@@ -669,6 +692,18 @@ function setFieldPerm(fieldKey, val) {
   if (!nodeId) return
   if (!fieldPermissions[nodeId]) fieldPermissions[nodeId] = {}
   fieldPermissions[nodeId][fieldKey] = val
+}
+
+function batchSetAllPerms(val) {
+  const nodeId = selectedNode.value?.id
+  if (!nodeId) return
+  if (!fieldPermissions[nodeId]) {
+    fieldPermissions[nodeId] = {}
+  }
+  formData.fields.forEach(field => {
+    fieldPermissions[nodeId][field.key] = val
+  })
+  window.$message?.success(`已一键将所有字段权限设为：${val === 'editable' ? '可编辑' : val === 'readonly' ? '只读' : '隐藏'}`)
 }
 
 const fieldPermissions = reactive({})
@@ -818,11 +853,20 @@ function buildPayload() {
   }))
 
   const nodePermissions = []
-  for (const nId of Object.keys(fieldPermissions)) {
-    for (const [fieldKey, permission] of Object.entries(fieldPermissions[nId])) {
-      nodePermissions.push({ nodeId: nId, fieldKey, permission })
-    }
-  }
+  payloadNodes.forEach(node => {
+    formData.fields.forEach(field => {
+      let perm = 'editable'
+      if (fieldPermissions[node.id] && fieldPermissions[node.id][field.key]) {
+        perm = fieldPermissions[node.id][field.key]
+      } else {
+        // Enforce defaults based on node type
+        if (node.type === 'approve' || node.type === 'end') {
+          perm = 'readonly'
+        }
+      }
+      nodePermissions.push({ nodeId: node.id, fieldKey: field.key, permission: perm })
+    })
+  })
 
   return {
     name: formData.name || '未命名流程',

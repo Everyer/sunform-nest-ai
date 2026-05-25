@@ -208,7 +208,18 @@ function extractCodeFromMarkdown(text) {
 }
 
 function onCodeGenerated(content) {
+  // 1. 如果能成功解析并应用局部修改补丁，则直接返回
   if (applyPatch(content)) return
+
+  // 2. 防火墙：识别当前流式生成是否为局部补丁（含 patches 结构特征字）
+  // 只要包含 patches 等局部微调特征，而 applyPatch 又未成功（说明大模型尚未吐完，JSON 还不完整，或外面包裹了错误标签）
+  // 此时必须静默拦截，绝对不能当作全量页面模板去解析，坚决防止流式打字期间破坏原有页面！
+  const isPatchFlow = /"patches"\s*:/i.test(content) || 
+                      /patches\s*"\s*:/i.test(content) || 
+                      (content.includes('"old"') && content.includes('"new"'));
+  if (isPatchFlow) {
+    return
+  }
 
   const extractedCode = extractCodeFromMarkdown(content)
   if (!extractedCode) return
