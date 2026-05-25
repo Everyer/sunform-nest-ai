@@ -69,8 +69,6 @@
             预览与打印
           </button>
           <button class="btn btn-accent" @click="saveTemplate">保存模板</button>
-          <button class="btn" style="background-color: #d97706; color: #ffffff;" @click="loadMergeDemoTemplate">图 2 复杂表</button>
-          <button class="btn" style="background-color: #059669; color: #ffffff;" @click="loadReportDemoTemplate">述职报告</button>
           <button class="btn btn-secondary" @click="clearCanvas">清空</button>
           <button class="btn btn-secondary" @click="loadDefaultTemplate">重置模板</button>
         </div>
@@ -237,6 +235,13 @@
               @click="activeTab = 'page'"
             >
               页面设置
+            </div>
+            <div 
+              class="tab-item" 
+              :class="{ 'is-active': activeTab === 'templates' }"
+              @click="activeTab = 'templates'"
+            >
+              模板库
             </div>
           </div>
           
@@ -683,6 +688,73 @@
                 <div class="form-item">
                   <label>网格步长大小 (mm)</label>
                   <input type="number" v-model.number="gridSize" />
+                </div>
+              </div>
+            </div>
+            
+            <!-- Tab 3: 模板库 -->
+            <div v-show="activeTab === 'templates'" class="tab-panel">
+              <div class="property-form" style="padding: 12px 16px;">
+                <div class="prop-section-title" style="margin-bottom: 12px; font-weight: 800; display: flex; align-items: center; gap: 6px;">
+                  📂 系统预设常用模板
+                </div>
+                
+                <div class="template-gallery" style="display: flex; flex-direction: column; gap: 14px;">
+                  <!-- 模板卡片 1: 销售订单 -->
+                  <div class="template-card-item" @click="loadDefaultTemplate" style="background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%); border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px; cursor: pointer; transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); position: relative; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.03);">
+                    <div style="font-weight: bold; font-size: 13px; color: #0c1832; display: flex; align-items: center; gap: 6px;">
+                      📦 销售订单报表 (纵向)
+                    </div>
+                    <p style="font-size: 11px; color: #64748b; margin: 6px 0 10px 0; line-height: 1.4;">
+                      经典的主从销货清单报表，包含客户信息、明细表格、财务合计、页码和条码二维码，完美适配 A4 纵向打印。
+                    </p>
+                    <div style="display: flex; gap: 6px;">
+                      <span style="font-size: 9px; background-color: #eff6ff; color: #1e40af; padding: 3px 8px; border-radius: 100px; font-weight: bold;">A4 纸张</span>
+                      <span style="font-size: 9px; background-color: #f1f5f9; color: #475569; padding: 3px 8px; border-radius: 100px; font-weight: bold;">纵向 Portrait</span>
+                    </div>
+                  </div>
+
+                  <!-- 模板卡片 2: 年度述职报告 -->
+                  <div class="template-card-item" @click="loadReportDemoTemplate" style="background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%); border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px; cursor: pointer; transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); position: relative; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.03);">
+                    <div style="font-weight: bold; font-size: 13px; color: #0c1832; display: flex; align-items: center; gap: 6px;">
+                      📊 年度述职考核报告 (纵向)
+                    </div>
+                    <p style="font-size: 11px; color: #64748b; margin: 6px 0 10px 0; line-height: 1.4;">
+                      配备复杂网格表头的双层合并表头考核表，支持大类自动行合并与汉字竖排，适合精细化工作总结排版。
+                    </p>
+                    <div style="display: flex; gap: 6px;">
+                      <span style="font-size: 9px; background-color: #eff6ff; color: #1e40af; padding: 3px 8px; border-radius: 100px; font-weight: bold;">A4 纸张</span>
+                      <span style="font-size: 9px; background-color: #f5f3ff; color: #5b21b6; padding: 3px 8px; border-radius: 100px; font-weight: bold;">复杂多行表头</span>
+                    </div>
+                  </div>
+
+                  <!-- 模板卡片 3: 商品送货单 (横向) -->
+                  <div class="template-card-item" @click="loadLandscapeDeliveryTemplate" style="background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%); border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px; cursor: pointer; transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); position: relative; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.03);">
+                    <div style="font-weight: bold; font-size: 13px; color: #0c1832; display: flex; align-items: center; gap: 6px;">
+                      🚚 客户送货单 (横向 - 宽幅)
+                    </div>
+                    <p style="font-size: 11px; color: #64748b; margin: 6px 0 10px 0; line-height: 1.4;">
+                      经典宽幅横向送货单，完美自适应 A4 Landscape 纸张，大表格宽视野，配备发货凭证、签收印章等细节。
+                    </p>
+                    <div style="display: flex; gap: 6px;">
+                      <span style="font-size: 9px; background-color: #eff6ff; color: #1e40af; padding: 3px 8px; border-radius: 100px; font-weight: bold;">A4 纸张</span>
+                      <span style="font-size: 9px; background-color: #fef3c7; color: #92400e; padding: 3px 8px; border-radius: 100px; font-weight: bold;">横向 Landscape</span>
+                    </div>
+                  </div>
+
+                  <!-- 模板卡片 4: 资产点收卡 (小尺寸卡片) -->
+                  <div class="template-card-item" @click="loadAssetTagTemplate" style="background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%); border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px; cursor: pointer; transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); position: relative; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.03);">
+                    <div style="font-weight: bold; font-size: 13px; color: #0c1832; display: flex; align-items: center; gap: 6px;">
+                      🏷️ 固定资产卡片 (A5小尺寸)
+                    </div>
+                    <p style="font-size: 11px; color: #64748b; margin: 6px 0 10px 0; line-height: 1.4;">
+                      专门针对小尺寸 A5 纸张打造的设备点收标签贴，带物理网格线与右侧主扫码枪条形码定位。
+                    </p>
+                    <div style="display: flex; gap: 6px;">
+                      <span style="font-size: 9px; background-color: #ecfdf5; color: #065f46; padding: 3px 8px; border-radius: 100px; font-weight: bold;">A5 小卡</span>
+                      <span style="font-size: 9px; background-color: #f1f5f9; color: #475569; padding: 3px 8px; border-radius: 100px; font-weight: bold;">扫码绑定</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1271,9 +1343,14 @@ const exitPreview = () => {
 };
 
 // 加载图 3 年度述职报告复杂表模板
-// 加载图 3 年度述职报告复杂表模板
 const loadReportDemoTemplate = () => {
   activeId.value = '';
+  // 🔑 重置纸张为 A4 纵向
+  paperSizePreset.value = 'A4';
+  isLandscape.value = false;
+  paperWidth.value = 210;
+  paperHeight.value = 297;
+  
   elements.value = [
     // 报表大标题
     {
@@ -1342,136 +1419,282 @@ const loadReportDemoTemplate = () => {
   ];
 };
 
-// 加载图 2 复杂合并单元格功能演示模板
-const loadMergeDemoTemplate = () => {
+// 加载常用模板 3：商品送货单（宽幅横向 - Landscape 自动转换）
+const loadLandscapeDeliveryTemplate = () => {
   activeId.value = '';
+  // 1. 切换为 A4
+  paperSizePreset.value = 'A4';
+  // 2. 强力启用横向
+  isLandscape.value = true;
+  paperWidth.value = 297;
+  paperHeight.value = 210;
+  
   elements.value = [
-    // 报表标题
+    // 标题区 (横向 297 宽度下，元素可用宽度增加到 277mm)
     {
-      id: 'el_title_merge',
+      id: 'el_title_deliv',
       type: 'text',
-      x: mmToPx(10), y: mmToPx(10), width: mmToPx(190), height: mmToPx(12),
-      value: '系统功能模块设计与需求说明书',
-      fontSize: 20, fontColor: '#0c1832', fontWeight: 'bold', align: 'center', valign: 'middle', showStrategy: 'all'
+      x: mmToPx(10), y: mmToPx(10), width: mmToPx(277), height: mmToPx(12),
+      value: '商贸物联送货发货单（三联凭证）',
+      fontSize: 22, fontColor: '#1e3a8a', fontWeight: 'bold', align: 'center', valign: 'middle', showStrategy: 'all'
     },
     {
-      id: 'el_subtitle_merge',
+      id: 'el_sub_deliv',
       type: 'text',
-      x: mmToPx(10), y: mmToPx(20), width: mmToPx(190), height: mmToPx(6),
-      value: '图 2 复杂合并单元格数据绑定与物理断页自动合并演示',
+      x: mmToPx(10), y: mmToPx(20), width: mmToPx(277), height: mmToPx(6),
+      value: '白联: 存根 | 绿联: 客户 | 红联: 财务回单',
       fontSize: 9, fontColor: '#64748b', align: 'center', valign: 'middle', showStrategy: 'all'
     },
-    // 粗底线
     {
-      id: 'el_line_top_merge',
+      id: 'el_line_top_deliv',
       type: 'line-h',
-      x: mmToPx(10), y: mmToPx(26), width: mmToPx(190), height: mmToPx(2),
-      borderWidth: 2, borderStyle: 'solid', fontColor: '#0c1832', showStrategy: 'all'
+      x: mmToPx(10), y: mmToPx(25), width: mmToPx(277), height: mmToPx(2),
+      borderWidth: 2, borderStyle: 'solid', fontColor: '#1e3a8a', showStrategy: 'all'
     },
     
-    // 主表数据区 (主从结合，项目基本信息)
+    // 主表单基本信息列 (横向布局富余，一行放四个属性)
     {
-      id: 'el_lbl_proj',
+      id: 'el_lbl1_deliv',
       type: 'text',
-      x: mmToPx(10), y: mmToPx(30), width: mmToPx(20), height: mmToPx(6),
-      value: '项目名称：',
+      x: mmToPx(10), y: mmToPx(29), width: mmToPx(20), height: mmToPx(6),
+      value: '送货单位：',
       fontSize: 10, fontColor: '#475569', fontWeight: 'bold', align: 'left', valign: 'middle', showStrategy: 'first'
     },
     {
-      id: 'el_val_proj',
+      id: 'el_val1_deliv',
       type: 'text',
-      x: mmToPx(30), y: mmToPx(30), width: mmToPx(75), height: mmToPx(6),
-      value: '${master.projectName}',
+      x: mmToPx(28), y: mmToPx(29), width: mmToPx(60), height: mmToPx(6),
+      value: '${master.customerName}',
       fontSize: 10, fontColor: '#0f172a', align: 'left', valign: 'middle', showStrategy: 'first'
     },
     {
-      id: 'el_lbl_dept',
+      id: 'el_lbl2_deliv',
       type: 'text',
-      x: mmToPx(110), y: mmToPx(30), width: mmToPx(20), height: mmToPx(6),
-      value: '编制部门：',
+      x: mmToPx(95), y: mmToPx(29), width: mmToPx(20), height: mmToPx(6),
+      value: '送货单号：',
       fontSize: 10, fontColor: '#475569', fontWeight: 'bold', align: 'left', valign: 'middle', showStrategy: 'first'
     },
     {
-      id: 'el_val_dept',
+      id: 'el_val2_deliv',
       type: 'text',
-      x: mmToPx(130), y: mmToPx(30), width: mmToPx(60), height: mmToPx(6),
-      value: '${master.department}',
-      fontSize: 10, fontColor: '#0f172a', align: 'left', valign: 'middle', showStrategy: 'first'
-    },
-    
-    // 第二行主表信息
-    {
-      id: 'el_lbl_compiler',
-      type: 'text',
-      x: mmToPx(10), y: mmToPx(37), width: mmToPx(20), height: mmToPx(6),
-      value: '编制人员：',
-      fontSize: 10, fontColor: '#475569', fontWeight: 'bold', align: 'left', valign: 'middle', showStrategy: 'first'
-    },
-    {
-      id: 'el_val_compiler',
-      type: 'text',
-      x: mmToPx(30), y: mmToPx(37), width: mmToPx(75), height: mmToPx(6),
-      value: '${master.compiler}',
+      x: mmToPx(113), y: mmToPx(29), width: mmToPx(50), height: mmToPx(6),
+      value: '${master.orderNo}',
       fontSize: 10, fontColor: '#0f172a', align: 'left', valign: 'middle', showStrategy: 'first'
     },
     {
-      id: 'el_lbl_compdate',
+      id: 'el_lbl3_deliv',
       type: 'text',
-      x: mmToPx(110), y: mmToPx(37), width: mmToPx(20), height: mmToPx(6),
-      value: '编制日期：',
+      x: mmToPx(170), y: mmToPx(29), width: mmToPx(20), height: mmToPx(6),
+      value: '联系电话：',
       fontSize: 10, fontColor: '#475569', fontWeight: 'bold', align: 'left', valign: 'middle', showStrategy: 'first'
     },
     {
-      id: 'el_val_compdate',
+      id: 'el_val3_deliv',
       type: 'text',
-      x: mmToPx(130), y: mmToPx(37), width: mmToPx(60), height: mmToPx(6),
-      value: '${master.compileDate}',
+      x: mmToPx(188), y: mmToPx(29), width: mmToPx(40), height: mmToPx(6),
+      value: '${master.contactPhone}',
+      fontSize: 10, fontColor: '#0f172a', align: 'left', valign: 'middle', showStrategy: 'first'
+    },
+    {
+      id: 'el_lbl4_deliv',
+      type: 'text',
+      x: mmToPx(235), y: mmToPx(29), width: mmToPx(15), height: mmToPx(6),
+      value: '经手：',
+      fontSize: 10, fontColor: '#475569', fontWeight: 'bold', align: 'left', valign: 'middle', showStrategy: 'first'
+    },
+    {
+      id: 'el_val4_deliv',
+      type: 'text',
+      x: mmToPx(248), y: mmToPx(29), width: mmToPx(30), height: mmToPx(6),
+      value: '${master.salesperson}',
       fontSize: 10, fontColor: '#0f172a', align: 'left', valign: 'middle', showStrategy: 'first'
     },
     
-    // 细分割线
+    // 中间细分割线
     {
-      id: 'el_line_mid_merge',
+      id: 'el_line_mid_deliv',
       type: 'line-h',
-      x: mmToPx(10), y: mmToPx(44), width: mmToPx(190), height: mmToPx(1),
-      borderWidth: 1, borderStyle: 'solid', fontColor: '#cbd5e1', showStrategy: 'first'
+      x: mmToPx(10), y: mmToPx(36), width: mmToPx(277), height: mmToPx(1),
+      borderWidth: 1, borderStyle: 'solid', fontColor: '#e2e8f0', showStrategy: 'first'
     },
-
-    // 核心多维合并表格 (图 2 完全一模一样的合并大表！)
+    
+    // 宽表格 (横向 A4 能够给明细表非常宽裕的字段展现空间，高度缩短以保证一页内排版极爽)
     {
-      id: 'el_merge_table',
+      id: 'el_table_deliv',
       type: 'table',
-      x: mmToPx(10), y: mmToPx(48), width: mmToPx(190), height: mmToPx(180),
+      x: mmToPx(10), y: mmToPx(40), width: mmToPx(277), height: mmToPx(100),
       repeatHeader: true,
       columns: [
-        { title: '序号', field: 'detail.index', width: 45, align: 'center', autoMerge: false },
-        { title: '模块名称', field: 'detail.module', width: 180, align: 'left', autoMerge: true },
-        { title: '功能项', field: 'detail.functionName', width: 220, align: 'left', autoMerge: false },
-        { title: '功能需求描述', field: 'detail.desc', width: 273, align: 'left', autoMerge: false }
+        { title: '序号', field: 'detail.index', width: 45, align: 'center' },
+        { title: '配送商品及规格说明', field: 'detail.goodsName', width: 380, align: 'left' },
+        { title: '数量', field: 'detail.quantity', width: 75, align: 'right' },
+        { title: '物理单位', field: 'detail.unit', width: 75, align: 'center' },
+        { title: '单价 (元)', field: 'detail.price', width: 105, align: 'right' },
+        { title: '发货金额', field: 'detail.amount', width: 120, align: 'right' },
+        { title: '配送追踪码', field: 'detail.goodsCode', width: 155, align: 'center' }
       ],
       showStrategy: 'all'
     },
     
-    // 每页公共页脚分割细线
+    // 送货专用红章 (盖章装饰效果)
     {
-      id: 'el_line_footer_merge',
-      type: 'line-h',
-      x: mmToPx(10), y: mmToPx(285), width: mmToPx(190), height: mmToPx(1),
-      borderWidth: 0.5, borderStyle: 'solid', fontColor: '#e2e8f0', showStrategy: 'all'
+      id: 'el_stamp_deliv',
+      type: 'text',
+      x: mmToPx(210), y: mmToPx(142), width: mmToPx(35), height: mmToPx(35),
+      value: '【已发货】',
+      fontSize: 18, fontColor: '#ef4444', fontWeight: 'bold', align: 'center', valign: 'middle', showStrategy: 'last'
     },
-    // 公共动态页码
+    
+    // 底部文字汇总与回执签名
     {
-      id: 'el_footer_pagenum_merge',
+      id: 'el_sum1_deliv',
+      type: 'text',
+      x: mmToPx(10), y: mmToPx(148), width: mmToPx(50), height: mmToPx(6),
+      value: '价税应收总计： ￥${master.grandTotal}',
+      fontSize: 11, fontColor: '#1e3a8a', fontWeight: 'bold', align: 'left', valign: 'middle', showStrategy: 'last'
+    },
+    {
+      id: 'el_sum2_deliv',
+      type: 'text',
+      x: mmToPx(70), y: mmToPx(148), width: mmToPx(60), height: mmToPx(6),
+      value: '收货人签收回执（盖章）： __________________',
+      fontSize: 10, fontColor: '#475569', align: 'left', valign: 'middle', showStrategy: 'last'
+    },
+    
+    // 物理页脚
+    {
+      id: 'el_line_foot_deliv',
+      type: 'line-h',
+      x: mmToPx(10), y: mmToPx(198), width: mmToPx(277), height: mmToPx(1),
+      borderWidth: 0.5, borderStyle: 'solid', fontColor: '#cbd5e1', showStrategy: 'all'
+    },
+    {
+      id: 'el_pagenum_deliv',
       type: 'page-number',
-      x: mmToPx(85), y: mmToPx(287), width: mmToPx(40), height: mmToPx(6),
+      x: mmToPx(128), y: mmToPx(200), width: mmToPx(40), height: mmToPx(6),
       fontSize: 9, fontColor: '#94a3b8', align: 'center', valign: 'middle', showStrategy: 'all'
     }
   ];
 };
 
+// 加载常用模板 4：固定资产标签卡片（A5 紧凑纸张）
+const loadAssetTagTemplate = () => {
+  activeId.value = '';
+  // 1. 切换为 A5
+  paperSizePreset.value = 'A5';
+  isLandscape.value = false;
+  paperWidth.value = 148;
+  paperHeight.value = 210;
+  
+  elements.value = [
+    // 标题卡
+    {
+      id: 'el_title_asset',
+      type: 'text',
+      x: mmToPx(8), y: mmToPx(8), width: mmToPx(132), height: mmToPx(10),
+      value: '固定资产设备管理卡片',
+      fontSize: 16, fontColor: '#0f172a', fontWeight: 'bold', align: 'center', valign: 'middle', showStrategy: 'all'
+    },
+    {
+      id: 'el_line_top_asset',
+      type: 'line-h',
+      x: mmToPx(8), y: mmToPx(19), width: mmToPx(132), height: mmToPx(1.5),
+      borderWidth: 1.5, borderStyle: 'solid', fontColor: '#0f172a', showStrategy: 'all'
+    },
+    
+    // 资产属性排版
+    {
+      id: 'el_lbl1_asset',
+      type: 'text',
+      x: mmToPx(8), y: mmToPx(24), width: mmToPx(25), height: mmToPx(6),
+      value: '设备名称：',
+      fontSize: 10, fontColor: '#475569', fontWeight: 'bold', align: 'left', valign: 'middle', showStrategy: 'all'
+    },
+    {
+      id: 'el_val1_asset',
+      type: 'text',
+      x: mmToPx(34), y: mmToPx(24), width: mmToPx(90), height: mmToPx(6),
+      value: '智能路由核心交换机 Node-04',
+      fontSize: 10, fontColor: '#0f172a', align: 'left', valign: 'middle', showStrategy: 'all'
+    },
+    {
+      id: 'el_lbl2_asset',
+      type: 'text',
+      x: mmToPx(8), y: mmToPx(32), width: mmToPx(25), height: mmToPx(6),
+      value: '保管部门：',
+      fontSize: 10, fontColor: '#475569', fontWeight: 'bold', align: 'left', valign: 'middle', showStrategy: 'all'
+    },
+    {
+      id: 'el_val2_asset',
+      type: 'text',
+      x: mmToPx(34), y: mmToPx(32), width: mmToPx(90), height: mmToPx(6),
+      value: '${master.department}',
+      fontSize: 10, fontColor: '#0f172a', align: 'left', valign: 'middle', showStrategy: 'all'
+    },
+    {
+      id: 'el_lbl3_asset',
+      type: 'text',
+      x: mmToPx(8), y: mmToPx(40), width: mmToPx(25), height: mmToPx(6),
+      value: '设备编号：',
+      fontSize: 10, fontColor: '#475569', fontWeight: 'bold', align: 'left', valign: 'middle', showStrategy: 'all'
+    },
+    {
+      id: 'el_val3_asset',
+      type: 'text',
+      x: mmToPx(34), y: mmToPx(40), width: mmToPx(90), height: mmToPx(6),
+      value: '${master.orderNo}',
+      fontSize: 10, fontColor: '#0c1832', fontWeight: 'bold', align: 'left', valign: 'middle', showStrategy: 'all'
+    },
+    
+    // 主体隔离细线
+    {
+      id: 'el_line_mid_asset',
+      type: 'line-h',
+      x: mmToPx(8), y: mmToPx(49), width: mmToPx(132), height: mmToPx(1),
+      borderWidth: 1, borderStyle: 'solid', fontColor: '#cbd5e1', showStrategy: 'all'
+    },
+    
+    // 条码定位扫码枪读取区 (居中)
+    {
+      id: 'el_barcode_asset',
+      type: 'barcode',
+      x: mmToPx(26), y: mmToPx(54), width: mmToPx(96), height: mmToPx(20),
+      value: '${master.orderNo}',
+      showText: true,
+      showStrategy: 'all'
+    },
+    
+    // 说明语与落款
+    {
+      id: 'el_desc_asset',
+      type: 'text',
+      x: mmToPx(8), y: mmToPx(78), width: mmToPx(132), height: mmToPx(10),
+      value: '注意：固定资产管理卡片，请贴于设备醒目侧面位置，妥善保管，防潮防火。',
+      fontSize: 8.5, fontColor: '#ef4444', align: 'center', valign: 'middle', showStrategy: 'all'
+    },
+    
+    // 页脚线
+    {
+      id: 'el_line_foot_asset',
+      type: 'line-h',
+      x: mmToPx(8), y: mmToPx(198), width: mmToPx(132), height: mmToPx(1),
+      borderWidth: 0.5, borderStyle: 'solid', fontColor: '#cbd5e1', showStrategy: 'all'
+    }
+  ];
+};
+
+
+
+
 // 加载默认模版 (即图片中的精美主从报表)
 const loadDefaultTemplate = () => {
   activeId.value = '';
+  // 🔑 重置纸张为 A4 纵向
+  paperSizePreset.value = 'A4';
+  isLandscape.value = false;
+  paperWidth.value = 210;
+  paperHeight.value = 297;
+  
   elements.value = [
     // 报表标题
     {
@@ -1950,7 +2173,7 @@ onBeforeUnmount(() => {
 }
 
 .section-elements {
-  height: 220px;
+  height: 290px;
   flex: none;
   display: flex;
   flex-direction: column;
