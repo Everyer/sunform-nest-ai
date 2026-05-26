@@ -101,8 +101,8 @@
                           letterSpacing: col.writingMode ? '2px' : 'normal',
                           padding: col.writingMode ? '10px 4px' : '5px 4px'
                         }"
+                        v-html="getRowValue(row, col.field)"
                       >
-                        {{ getRowValue(row, col.field) }}
                       </td>
                     </template>
                   </tr>
@@ -598,40 +598,68 @@ function checkShowStrategy(el, curPage, totalPages) {
   return true;
 }
 
-// 数据字段绑定解析引擎 (正则表达式递归替换)
+// 🔑 万能深度嵌套路径解析函数 (如 getValueByPath({a:{b:{c:3}}}, 'a.b.c') -> 3)
+function getValueByPath(obj, path) {
+  if (!obj || !path) return '';
+  // 兼容原本旧模板绑定为 'master.orderNo' 或 'detail.goodsName' 但数据源已经被重构打平的情况
+  let normalizedPath = path;
+  if (normalizedPath.startsWith('master.')) {
+    normalizedPath = normalizedPath.substring(7);
+  } else if (normalizedPath.startsWith('detail.')) {
+    normalizedPath = normalizedPath.substring(7);
+  }
+  
+  const parts = normalizedPath.split('.');
+  let current = obj;
+  for (const part of parts) {
+    if (current == null) return '';
+    current = current[part];
+  }
+  return current !== undefined ? current : '';
+}
+
+// 数据字段绑定解析引擎 (正则表达式递归替换，完美支持 ${user.name} 或 ${a.b.c} 任何层级)
 function interpolate(val, curPage, totalPages) {
   if (typeof val !== 'string') return val;
-  let res = val.replace(/\$\{master\.(\w+)\}/g, (match, key) => {
-    return activeMockData.value.master[key] !== undefined ? activeMockData.value.master[key] : '';
+  
+  // 1. 替换 ${...} 万能表达式
+  let res = val.replace(/\$\{([^}]+)\}/g, (match, path) => {
+    // 兼容内置页码变量
+    if (path === 'page.index') return curPage;
+    if (path === 'page.total') return totalPages;
+    
+    // 从活动 Mock 数据源中通过深度路径获取对应数值
+    const value = getValueByPath(activeMockData.value, path);
+    return value !== undefined && value !== null ? value : '';
   });
   
-  // 页码内置变量解析
+  // 2. 兜底页码内置变量解析
   res = res.replace(/\$\{page\.index\}/g, curPage);
   res = res.replace(/\$\{page\.total\}/g, totalPages);
   
   return res;
 }
 
-// 获取表格从表行的子字段值 (深度升级：全面支持 detail.xxx, master.xxx 以及任意主从插值)
+// 获取表格从表行的子字段值 (深度升级：全面支持以行数据为基准的相对万能深度路径，如 SKU.barcode)
 function getRowValue(row, field) {
   if (!field) return "";
   
-  // 1. 支持单元格直接绑定主表字段，如 `master.orderNo`
-  if (typeof field === 'string' && field.startsWith('master.')) {
-    const key = field.replace('master.', '');
-    return activeMockData.value.master[key] !== undefined ? activeMockData.value.master[key] : '';
+  // 1. 支持单元格直接绑定主数据源路径，如 `master.orderNo` 或 `customer.name`
+  if (typeof field === 'string' && (field.startsWith('master.') || field.includes('.'))) {
+    // 判断如果前缀在 activeMockData 里有定义，可以跨行拿到顶层主表属性
+    const parts = field.split('.');
+    if (activeMockData.value[parts[0]] !== undefined) {
+      return getValueByPath(activeMockData.value, field);
+    }
   }
   
-  // 2. 支持单元格带有插值语法，如 `客户: \${master.customerName}`
-  if (typeof field === 'string' && field.includes('${master.')) {
-    return field.replace(/\$\{master\.(\w+)\}/g, (match, key) => {
-      return activeMockData.value.master[key] !== undefined ? activeMockData.value.master[key] : '';
-    });
+  // 2. 支持单元格带有插值语法，如 `客户: \${customer.name}`
+  if (typeof field === 'string' && field.includes('${')) {
+    return interpolate(field, 1, 1);
   }
   
-  // 3. 默认绑定从表明细属性，如 `detail.goodsName`
-  const key = field.replace('detail.', '');
-  return row[key] !== undefined ? row[key] : '';
+  // 3. 默认绑定当前表格行对象的相对属性路径
+  return getValueByPath(row, field);
 }
 
 // 计算物理跨页切片中的相邻行合并 rowspan 状态 (核心高级合并算法)

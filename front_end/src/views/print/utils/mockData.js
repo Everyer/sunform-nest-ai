@@ -28,7 +28,7 @@ export const mockData = {
     { 
       index: 4, 
       goodsCode: 'P004', 
-      goodsName: '<div style="display: flex; align-items: center; gap: 8px;"><img src="https://fuss10.elemecdn.com/e/5d/4a731a90594a4af544c0c25941171jpeg.jpeg" style="width: 32px; height: 32px; border-radius: 4px; object-fit: cover; border: 1px solid #e2e8f0;" /><div><div>数据可视化模板包</div><div style="font-size: 10px; color: #10b981;">包含经典30套</div></div></div>', 
+      goodsName: '<div style="display: flex; align-items: center; gap: 8px;"><img src="https://fuss10.elemecdn.com/e/5d/4a731a90594a4af544c0c25941171jpeg.jpeg" style="width: 100px; height: 100px; border-radius: 4px; object-fit: cover; border: 1px solid #e2e8f0;" /><div><div>数据可视化模板包</div><div style="font-size: 10px; color: #10b981;">包含经典30套</div></div></div>', 
       spec: '精选30套', 
       unit: '个', 
       quantity: 3, 
