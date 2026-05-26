@@ -76,12 +76,15 @@
 
       <!-- 主工作区分流布局 -->
       <main class="designer-main">
-        <!-- 左侧：元素托盘 + 数据源面板 -->
-        <aside class="sidebar-left">
-          <!-- 元素托盘 -->
-          <section class="section-elements">
-            <h3 class="panel-title">设计元素</h3>
-            <div class="element-grid">
+        <!-- 左侧：元素托盘 + 数据源面板 (带高级手风琴折叠，解决拥挤问题) -->
+        <aside class="sidebar-left" style="display: flex; flex-direction: column; overflow: hidden; height: 100%;">
+          <!-- 1. 设计元素区块 -->
+          <section class="section-elements" :class="{ 'is-collapsed': elementsCollapse }" style="display: flex; flex-direction: column; flex-shrink: 0;">
+            <h3 class="panel-title" style="cursor: pointer; display: flex; align-items: center; justify-content: space-between; user-select: none;" @click="elementsCollapse = !elementsCollapse">
+              <span>设计元素</span>
+              <span style="font-size: 11px; color: #94a3b8; transition: transform 0.2s;" :style="{ transform: elementsCollapse ? 'rotate(-90deg)' : 'rotate(0deg)' }">▼</span>
+            </h3>
+            <div class="element-grid" v-show="!elementsCollapse" style="padding: 10px 14px 18px 14px;">
               <div 
                 v-for="item in toolboxItems" 
                 :key="item.type"
@@ -95,57 +98,72 @@
             </div>
           </section>
           
-          <!-- 数据源绑定列表 -->
-          <section class="section-datasource">
-            <h3 class="panel-title" style="display: flex; align-items: center; justify-content: space-between;">
-              <span>📂 万能 JSON 变量数据树</span>
-              <span style="font-size: 10px; color: #10b981; font-weight: normal; text-transform: none;">自动匹配模板</span>
+          <!-- 2. JSON 变量树 -->
+          <section class="section-datasource" :class="{ 'is-collapsed': datasourceCollapse }" style="display: flex; flex-direction: column; flex: 1; min-height: 0;">
+            <h3 class="panel-title" style="cursor: pointer; display: flex; align-items: center; justify-content: space-between; user-select: none;" @click="datasourceCollapse = !datasourceCollapse">
+              <span>JSON 变量树</span>
+              <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
+                <span v-if="testDebugData" class="debug-badge-active" style="white-space: nowrap;">真实联调</span>
+                <span style="font-size: 11px; color: #94a3b8; transition: transform 0.2s;" :style="{ transform: datasourceCollapse ? 'rotate(-90deg)' : 'rotate(0deg)' }">▼</span>
+              </div>
             </h3>
-            <div class="data-tree" style="padding: 10px 12px; overflow-y: auto; flex: 1;">
-              <div 
-                v-for="(node, index) in treeNodes" 
-                :key="index"
-                class="tree-node"
-                :style="{
-                  padding: '5px 8px',
-                  borderRadius: '6px',
-                  marginBottom: '3px',
-                  transition: 'all 0.15s ease',
-                  backgroundColor: node.isGroup ? '#f8fafc' : node.isList ? '#eff6ff' : 'transparent',
-                  paddingLeft: node.isSub ? '24px' : node.isGroup ? '8px' : '12px',
-                  cursor: node.isGroup ? 'default' : 'pointer'
-                }"
-                :title="node.isGroup ? '对象容器' : '双击自动插入当前选中的文本组件中，单选点击复制变量路径'"
-                @click="!node.isGroup && copyVariable(node.path)"
-                @dblclick="!node.isGroup && insertVariableToActive(node.path)"
-              >
-                <div style="display: flex; flex-direction: column; gap: 1px;">
-                  <span class="node-key" :style="{ 
-                    fontSize: '11px', 
-                    fontFamily: 'monospace',
-                    color: node.isList ? '#2563eb' : node.isSub ? '#10b981' : node.isGroup ? '#64748b' : '#d97706',
-                    fontWeight: node.isGroup || node.isList ? 'bold' : 'normal'
-                  }">
-                    {{ node.path }}
-                  </span>
-                  <span class="node-label" style="font-size: 10px; color: #64748b; margin-top: 1px;">
-                    {{ node.label }}
-                  </span>
+            
+            <template v-if="!datasourceCollapse">
+              <div class="data-tree" style="padding: 10px 12px; overflow-y: auto; flex: 1; min-height: 0;">
+                <div 
+                  v-for="(node, index) in treeNodes" 
+                  :key="index"
+                  class="tree-node"
+                  :style="{
+                    padding: '5px 8px',
+                    borderRadius: '6px',
+                    marginBottom: '3px',
+                    transition: 'all 0.15s ease',
+                    backgroundColor: node.isGroup ? '#f8fafc' : node.isList ? '#eff6ff' : 'transparent',
+                    paddingLeft: node.isSub ? '24px' : node.isGroup ? '8px' : '12px',
+                    cursor: node.isGroup ? 'default' : 'pointer',
+                    wordBreak: 'break-all',
+                    overflowWrap: 'break-word'
+                  }"
+                  :title="node.isGroup ? '对象容器' : '双击自动插入当前选中的文本组件中，单选点击复制变量路径'"
+                  @click="!node.isGroup && copyVariable(node.path)"
+                  @dblclick="!node.isGroup && insertVariableToActive(node.path)"
+                >
+                  <div style="display: flex; flex-direction: column; gap: 1px; min-width: 0; width: 100%; word-break: break-all; overflow-wrap: break-word;">
+                    <span class="node-key" :style="{ 
+                      fontSize: '11px', 
+                      fontFamily: 'monospace',
+                      color: node.isList ? '#2563eb' : node.isSub ? '#10b981' : node.isGroup ? '#64748b' : '#d97706',
+                      fontWeight: node.isGroup || node.isList ? 'bold' : 'normal',
+                      wordBreak: 'break-all',
+                      whiteSpace: 'normal',
+                      display: 'block',
+                      overflowWrap: 'break-word'
+                    }">
+                      {{ node.path }}
+                    </span>
+                    <span class="node-label" style="font-size: 10px; color: #64748b; margin-top: 1px; word-break: break-all; white-space: normal; display: block; overflow-wrap: break-word;">
+                      {{ node.label }}
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
-            <div class="datasource-tips" style="font-size: 10.5px; line-height: 1.5; color: #64748b; background-color: #f8fafc; border-top: 1px solid #e8ecf2; padding: 10px 14px;">
-              💡 <b>温馨提示：</b>单击树中任意节点即可<b>一键复制变量路径</b>；双击即可直接<b>插入至画布中文本框光标后</b>，开发效率极高！
-            </div>
+              <div class="datasource-tips" style="font-size: 10.5px; line-height: 1.5; color: #64748b; background-color: #f8fafc; border-top: 1px solid #e8ecf2; padding: 10px 14px; flex-shrink: 0;">
+                💡 <b>小贴士：</b>单击一键复制变量；双击直接<b>插入到画布文本光标后</b>。
+              </div>
+            </template>
           </section>
 
-          <!-- 图层大纲 -->
-          <section class="section-outline">
-            <h3 class="outline-title-bar">
-              <span>图层大纲</span>
-              <span class="badge">{{ elements.length }}</span>
+          <!-- 3. 图层大纲 -->
+          <section class="section-outline" :class="{ 'is-collapsed': outlineCollapse }" style="display: flex; flex-direction: column; flex-shrink: 0;" :style="{ height: outlineCollapse ? '43px' : '220px' }">
+            <h3 class="outline-title-bar" style="cursor: pointer; display: flex; align-items: center; justify-content: space-between; user-select: none;" @click="outlineCollapse = !outlineCollapse">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span>图层大纲</span>
+                <span class="badge">{{ elements.length }}</span>
+              </div>
+              <span style="font-size: 11px; color: #94a3b8; transition: transform 0.2s;" :style="{ transform: outlineCollapse ? 'rotate(-90deg)' : 'rotate(0deg)' }">▼</span>
             </h3>
-            <div class="outline-list">
+            <div class="outline-list" v-show="!outlineCollapse" style="flex: 1; overflow-y: auto;">
               <div 
                 v-for="el in elements.slice().reverse()" 
                 :key="el.id"
@@ -640,7 +658,66 @@
                 <div class="form-item">
                   <label>🔗 关联业务详情/列表接口 (apiPath)</label>
                   <input type="text" v-model="apiPath" placeholder="例如：/api/v1/sales/order/detail" />
-                  <p class="field-desc-text">运行时，根据此 apiPath 及传入的 businessId 动态反射拉取 JSON 数据。</p>
+                  <p class="field-desc-text">运行时，根据此 apiPath 动态拉取数据。</p>
+                </div>
+
+                <!-- 🔍 真实数据接口调试联调面板 (移至页面设置，更宽敞) -->
+                <div class="prop-divider"></div>
+                <div class="prop-section-title" style="display: flex; align-items: center; justify-content: space-between;">
+                  <span>🔗 真实数据接口联调调试</span>
+                  <span v-if="testDebugData" class="debug-badge-active" style="font-size: 8.5px;">已连通</span>
+                  <span v-else class="debug-badge-inactive" style="font-size: 8.5px;">Demo模式</span>
+                </div>
+                
+                <div class="form-row-2">
+                  <div class="form-item">
+                    <label>请求方式</label>
+                    <select v-model="testMethod" style="height: 34px;">
+                      <option value="GET">GET 请求</option>
+                      <option value="POST">POST 请求</option>
+                    </select>
+                  </div>
+                  <div class="form-item">
+                    <label>测试业务主键 ID (可选)</label>
+                    <input type="text" v-model="testBusinessId" placeholder="例如: 12" style="height: 34px;" />
+                  </div>
+                </div>
+
+                <div class="form-item">
+                  <label>高级请求参数 JSON (Query / Body)</label>
+                  <textarea 
+                    v-model="testParams" 
+                    placeholder='例如: {"status": 1, "deptCode": "IT"}' 
+                    rows="3" 
+                    style="font-family: monospace; font-size: 11px; line-height: 1.3; width: 100%; border: 1px solid #cbd5e1; border-radius: 6px; padding: 6px 8px; outline: none; background-color: #fafafa; transition: border 0.15s;"
+                    @focus="$event.target.style.borderColor = '#d97706'"
+                    @blur="$event.target.style.borderColor = '#cbd5e1'"
+                  ></textarea>
+                  <p class="field-desc-text">若为 GET，参数会自动序列化为 URL 参数；若为 POST，会自动作为 Request Body 发送。</p>
+                </div>
+
+                <div style="display: flex; gap: 8px; margin-top: 4px;">
+                  <button 
+                    class="btn btn-primary" 
+                    style="flex: 1; height: 36px; font-size: 12.5px; border-radius: 6px; font-weight: bold; display: flex; align-items: center; justify-content: center; gap: 4px;"
+                    :disabled="isTestingApi"
+                    @click="handleFetchTestData"
+                  >
+                    <span v-if="isTestingApi">正在反射连通中...</span>
+                    <span v-else>开始连通测试</span>
+                  </button>
+                  <button 
+                    v-if="testDebugData"
+                    class="btn btn-secondary" 
+                    style="height: 36px; font-size: 12.5px; border-radius: 6px; color: #dc2626; background-color: #fef2f2; border: 1px solid #fee2e2;"
+                    @click="clearTestData"
+                  >
+                    重置演示
+                  </button>
+                </div>
+
+                <div v-if="testDebugData" style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; padding: 8px 10px; margin-top: 10px; font-size: 11px; color: #16a34a; line-height: 1.4;">
+                  ✔ <b>连通成功：</b>已拉取真实 JSON。左侧<b>「万能JSON变量树」</b>已彻底对齐您内网的真实字段，可双击直接绑定！
                 </div>
 
                 <div class="prop-divider"></div>
@@ -702,14 +779,14 @@
             <div v-show="activeTab === 'templates'" class="tab-panel">
               <div class="property-form" style="padding: 12px 16px;">
                 <div class="prop-section-title" style="margin-bottom: 12px; font-weight: 800; display: flex; align-items: center; gap: 6px;">
-                  📂 系统预设常用模板
+                  系统预设常用模板
                 </div>
                 
                 <div class="template-gallery" style="display: flex; flex-direction: column; gap: 14px;">
                   <!-- 模板卡片 1: 销售订单 -->
                   <div class="template-card-item" @click="loadDefaultTemplate" style="background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%); border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px; cursor: pointer; transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); position: relative; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.03);">
                     <div style="font-weight: bold; font-size: 13px; color: #0c1832; display: flex; align-items: center; gap: 6px;">
-                      📦 销售订单报表 (纵向)
+                      销售订单报表 (纵向)
                     </div>
                     <p style="font-size: 11px; color: #64748b; margin: 6px 0 10px 0; line-height: 1.4;">
                       经典的主从销货清单报表，包含客户信息、明细表格、财务合计、页码和条码二维码，完美适配 A4 纵向打印。
@@ -723,7 +800,7 @@
                   <!-- 模板卡片 2: 年度述职报告 -->
                   <div class="template-card-item" @click="loadReportDemoTemplate" style="background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%); border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px; cursor: pointer; transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); position: relative; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.03);">
                     <div style="font-weight: bold; font-size: 13px; color: #0c1832; display: flex; align-items: center; gap: 6px;">
-                      📊 年度述职考核报告 (纵向)
+                      年度述职考核报告 (纵向)
                     </div>
                     <p style="font-size: 11px; color: #64748b; margin: 6px 0 10px 0; line-height: 1.4;">
                       配备复杂网格表头的双层合并表头考核表，支持大类自动行合并与汉字竖排，适合精细化工作总结排版。
@@ -737,7 +814,7 @@
                   <!-- 模板卡片 3: 商品送货单 (横向) -->
                   <div class="template-card-item" @click="loadLandscapeDeliveryTemplate" style="background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%); border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px; cursor: pointer; transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); position: relative; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.03);">
                     <div style="font-weight: bold; font-size: 13px; color: #0c1832; display: flex; align-items: center; gap: 6px;">
-                      🚚 客户送货单 (横向 - 宽幅)
+                      客户送货单 (横向 - 宽幅)
                     </div>
                     <p style="font-size: 11px; color: #64748b; margin: 6px 0 10px 0; line-height: 1.4;">
                       经典宽幅横向送货单，完美自适应 A4 Landscape 纸张，大表格宽视野，配备发货凭证、签收印章等细节。
@@ -751,7 +828,7 @@
                   <!-- 模板卡片 4: 资产点收卡 (小尺寸卡片) -->
                   <div class="template-card-item" @click="loadAssetTagTemplate" style="background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%); border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px; cursor: pointer; transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); position: relative; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.03);">
                     <div style="font-weight: bold; font-size: 13px; color: #0c1832; display: flex; align-items: center; gap: 6px;">
-                      🏷️ 固定资产卡片 (A5小尺寸)
+                      固定资产卡片 (A5小尺寸)
                     </div>
                     <p style="font-size: 11px; color: #64748b; margin: 6px 0 10px 0; line-height: 1.4;">
                       专门针对小尺寸 A5 纸张打造的设备点收标签贴，带物理网格线与右侧主扫码枪条形码定位。
@@ -777,6 +854,11 @@
         :paper-height="paperHeight"
         :page-margins="pageMargins"
         :is-landscape="isLandscape"
+        :runtime-data="testDebugData"
+        :api-path="apiPath"
+        :test-method="testMethod"
+        :test-params="testParams"
+        :test-business-id="testBusinessId"
         @close="exitPreview"
       />
     </template>
@@ -785,10 +867,16 @@
 
 <script setup>
 import { ref, reactive, computed, watch, onMounted, onBeforeUnmount } from 'vue';
+import { useRoute } from 'vue-router';
 import Ruler from './components/Ruler.vue';
 import DesignCanvas from './components/DesignCanvas.vue';
 import PrintPreview from './components/PrintPreview.vue';
 import { mockData, reportMockData, deliveryMockData, assetMockData } from './utils/mockData.js';
+import { getPrintTemplateDetail, updatePrintTemplate } from '@/api/printTemplate';
+
+const route = useRoute();
+const dbRecordId = ref(route.query.id || ''); // 数据库记录主键 ID
+
 
 defineOptions({ name: "ReportPrintDesigner" });
 
@@ -818,6 +906,20 @@ const templateId = ref('tpl_' + Math.random().toString(36).substr(2, 9));
 const templateName = ref('未命名打印模板');
 const apiPath = ref('/api/v1/business/detail'); // 默认绑定的万能业务详情接口
 
+// 🔍 真实数据接口调试模块
+const testBusinessId = ref(''); // 用户输入的接口调试测试 ID
+const testMethod = ref('GET');  // 请求方法: GET / POST
+const testParams = ref('{}');   // 调试用的 Query 参数或 POST Body JSON 字符串
+const testDebugData = ref(null); // 存储接口拉回的真实 JSON 结构，若存在，则直接覆盖 mock 充当大纲数据源
+const isTestingApi = ref(false); // 是否在接口测试中
+
+// 🔑 左侧边栏抽屉折叠状态 (默认展开“设计元素”与“JSON 变量树”，大纲默认折叠)
+const elementsCollapse = ref(false);
+const datasourceCollapse = ref(false);
+const outlineCollapse = ref(true);
+
+
+
 
 // 页面边距设置 (单位：毫米)
 const pageMargins = reactive({
@@ -831,6 +933,13 @@ const pageMargins = reactive({
 const isPreview = ref(false);
 const activeTab = ref('style');
 
+// 🔍 自动聚焦：当有组件被选中激活（activeId 改变且不为空）时，右侧属性面板自动切换至【组件属性】标签页
+watch(activeId, (newId) => {
+  if (newId) {
+    activeTab.value = 'style';
+  }
+});
+
 // 选中的组件对象
 const activeElement = computed(() => {
   return elements.value.find(item => item.id === activeId.value);
@@ -838,6 +947,11 @@ const activeElement = computed(() => {
 
 // 🔑 自动感知当前模板适用的 Mock 数据源 (与 PrintPreview 保持完全同步！)
 const activeMockData = computed(() => {
+  // 🔍 调试测试优先：如果用户输入 id 进行了接口联调测试拿到了真实 JSON，直接充当大纲及解析源
+  if (testDebugData.value) {
+    return testDebugData.value;
+  }
+
   const hasReportKeyword = elements.value.some(el => {
     if (typeof el.value === 'string' && (el.value.includes('info.') || el.value.includes('records'))) return true;
     if (el.type === 'table' && el.dataSourcePath === 'records') return true;
@@ -1386,7 +1500,19 @@ const getElementLabel = (el) => {
 // 复制变量到剪贴板
 const copyVariable = (str) => {
   navigator.clipboard.writeText(str).then(() => {
-    alert(`变量 "${str}" 已复制到剪贴板，可粘贴至文本组件中。`);
+    if (window.$message) {
+      window.$message.success(`已复制变量: ${str}`);
+    } else {
+      // 降级使用轻量级悬浮 toast，杜绝阻断式浏览器 alert
+      const toast = document.createElement('div');
+      toast.innerText = `已复制变量: ${str}`;
+      toast.style.cssText = 'position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #1e293b; color: #ffffff; padding: 8px 16px; border-radius: 6px; font-size: 12px; z-index: 99999; box-shadow: 0 4px 12px rgba(0,0,0,0.15); transition: opacity 0.2s ease;';
+      document.body.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 200);
+      }, 1500);
+    }
   });
 };
 
@@ -1394,6 +1520,13 @@ const copyVariable = (str) => {
 const insertVariableToActive = (str) => {
   if (activeElement.value && activeElement.value.type === 'text') {
     activeElement.value.value += str;
+    if (window.$message) {
+      window.$message.success(`已插入变量 ${str} 至当前文本组件`);
+    }
+  } else {
+    if (window.$message) {
+      window.$message.warning('请先在画布中选中需要插入变量的文本组件！');
+    }
   }
 };
 
@@ -1422,11 +1555,22 @@ const clearCanvas = () => {
 };
 
 // 预览和打印切换
-const enterPreview = () => {
+const enterPreview = async () => {
   if (elements.value.length === 0) {
     alert('画布中还没有任何元素，请先拖入一些元素再预览吧。');
     return;
   }
+  
+  // 🔍 预览入口：如果配置了接口，在渲染预览组件前重新调一遍接口获取最新真实业务数据
+  if (apiPath.value && apiPath.value.trim()) {
+    try {
+      window.$message?.info('正在静默同步最新测试接口业务数据，请稍候...');
+      await handleFetchTestData();
+    } catch (err) {
+      console.error('[Preview API Refetch Failed]', err);
+    }
+  }
+
   activeId.value = ''; // 预览前清除选中
   isPreview.value = true;
 };
@@ -2007,9 +2151,9 @@ const loadDefaultTemplate = () => {
   ];
 };
 
-const saveTemplate = () => {
+const saveTemplate = async () => {
   try {
-    const templatePayload = {
+    const payload = {
       templateId: templateId.value,
       templateName: templateName.value,
       apiPath: apiPath.value,
@@ -2018,24 +2162,75 @@ const saveTemplate = () => {
       paperHeight: paperHeight.value,
       isLandscape: isLandscape.value,
       gridSize: gridSize.value,
-      pageMargins: { ...pageMargins },
-      elements: elements.value
+      pageMargins: JSON.stringify(pageMargins),
+      elementsJson: JSON.stringify(elements.value),
+      appId: 'default',
+      remark: '在可视化设计器中更新保存'
     };
-    
-    const templateData = JSON.stringify(templatePayload, null, 2);
-    localStorage.setItem('report-print-template', templateData);
-    alert(`模板「${templateName.value}」已成功保存至浏览器本地缓存(LocalStorage)中！`);
+
+    if (dbRecordId.value) {
+      // 1. 如果有 Nest 后端物理主键 ID，提交更新到后台数据库表 tb_print_template 中
+      await updatePrintTemplate({
+        id: dbRecordId.value,
+        ...payload
+      });
+      window.$message?.success(`模板「${templateName.value}」已成功保存至后台数据库中！`);
+    } else {
+      // 2. 兜底 LocalStorage 本地保存
+      const localPayload = {
+        ...payload,
+        pageMargins,
+        elements: elements.value
+      };
+      localStorage.setItem('report-print-template', JSON.stringify(localPayload, null, 2));
+      alert(`模板「${templateName.value}」已成功保存至浏览器本地缓存中！`);
+    }
   } catch (e) {
-    alert('模板保存失败：' + e.message);
+    if (window.$message) {
+      window.$message.error('模板保存失败：' + e.message);
+    } else {
+      alert('模板保存失败：' + e.message);
+    }
   }
 };
 
-const loadSavedTemplate = () => {
+const loadSavedTemplate = async () => {
+  if (dbRecordId.value) {
+    // 从 NestJS 接口动态获取配置并回填
+    try {
+      const res = await getPrintTemplateDetail(dbRecordId.value);
+      if (res) {
+        templateId.value = res.templateId;
+        templateName.value = res.templateName;
+        apiPath.value = res.apiPath || '/api/v1/business/detail';
+        paperSizePreset.value = res.paperSizePreset || 'A4';
+        paperWidth.value = res.paperWidth || 210;
+        paperHeight.value = res.paperHeight || 297;
+        isLandscape.value = typeof res.isLandscape === 'boolean' ? res.isLandscape : false;
+        gridSize.value = res.gridSize || 5;
+        if (res.pageMargins) {
+          try {
+            const parsed = JSON.parse(res.pageMargins);
+            Object.assign(pageMargins, parsed);
+          } catch(e){}
+        }
+        if (res.elementsJson) {
+          try {
+            elements.value = JSON.parse(res.elementsJson);
+          } catch(e){}
+        }
+        return true;
+      }
+    } catch (e) {
+      window.$message?.error('从后台加载模板失败：' + e.message);
+    }
+  }
+  
+  // 兜底 LocalStorage
   const saved = localStorage.getItem('report-print-template');
   if (saved) {
     try {
       const payload = JSON.parse(saved);
-      // 兼容老版本只存了数组的情况
       if (Array.isArray(payload)) {
         elements.value = payload;
       } else {
@@ -2053,9 +2248,7 @@ const loadSavedTemplate = () => {
         elements.value = payload.elements || [];
       }
       return true;
-    } catch(e) {
-      console.error('解析缓存模板失败:', e);
-    }
+    } catch(e) {}
   }
   return false;
 };
@@ -2072,10 +2265,96 @@ const handleKeyDown = (e) => {
   }
 };
 
-onMounted(() => {
-  // 首次加载：默认进来直接加载模版库第一个（销售订单报表模板）
-  loadDefaultTemplate();
+// 🔍 请求真实接口测试数据
+import service from '@/api/index';
+
+const handleFetchTestData = async () => {
+  if (!apiPath.value.trim()) {
+    window.$message?.warning('请先在【页面设置】面板配置当前模板绑定的详情/列表数据源接口 apiPath！');
+    return;
+  }
+
+  isTestingApi.value = true;
+  try {
+    const rawPath = apiPath.value.trim();
+    
+    // 解析用户输入的参数 JSON 字符串
+    let customParams = {};
+    if (testParams.value && testParams.value.trim()) {
+      try {
+        customParams = JSON.parse(testParams.value.trim());
+      } catch(e) {
+        window.$message?.warning('高级参数 JSON 格式不正确，请确保为标准的键值对 JSON 字符串！');
+        isTestingApi.value = false;
+        return;
+      }
+    }
+
+    // 智能将用户输入的“业务记录 ID”注入到参数池或 URL 中
+    if (testBusinessId.value.trim()) {
+      customParams.id = testBusinessId.value.trim();
+      customParams.businessId = testBusinessId.value.trim();
+    }
+
+    let finalUrl = rawPath;
+    let res = null;
+
+    if (testMethod.value === 'POST') {
+      window.$message?.info(`[POST] 正在请求真实业务数据：${finalUrl} ...`);
+      res = await service.post(finalUrl, customParams);
+    } else {
+      // GET 请求：把所有参数序列化拼接为 Query string
+      // 智能感知 URL 占位符如 /api/detail/{id}
+      if (testBusinessId.value.trim() && finalUrl.includes('{id}')) {
+        finalUrl = finalUrl.replace('{id}', testBusinessId.value.trim());
+      }
+      
+      const queryParts = [];
+      for (const [key, val] of Object.entries(customParams)) {
+        // 如果是占位符形式，已经在 URL 里替换了，query 中就不重复拼接
+        if (rawPath.includes('{id}') && (key === 'id' || key === 'businessId')) {
+          continue;
+        }
+        queryParts.push(`${encodeURIComponent(key)}=${encodeURIComponent(val)}`);
+      }
+      
+      if (queryParts.length > 0) {
+        finalUrl = `${finalUrl}${finalUrl.includes('?') ? '&' : '?'}${queryParts.join('&')}`;
+      }
+      
+      window.$message?.info(`[GET] 正在请求真实业务数据：${finalUrl} ...`);
+      res = await service.get(finalUrl);
+    }
+    
+    if (res) {
+      testDebugData.value = res; // 灌入测试数据
+      window.$message?.success('🎉 真实业务数据源拉取并匹配成功！左侧变量树已无缝切换为真实数据，双击直接设计绑定！');
+    } else {
+      window.$message?.warning('接口未返回有效数据，请检查传入的参数或 ID 是否真实存在。');
+    }
+  } catch (err) {
+    console.error('接口测试失败:', err);
+    window.$message?.error(`接口联调失败: ${err.message || '请核实该接口是否在公司内网运行或检查控制台跨域限制。'}`);
+  } finally {
+    isTestingApi.value = false;
+  }
+};
+
+const clearTestData = () => {
+  testDebugData.value = null;
+  testBusinessId.value = '';
+  testParams.value = '{}';
+  window.$message?.info('已恢复为设计器默认 Mock 演示数据源。');
+};
+
+onMounted(async () => {
   window.addEventListener('keydown', handleKeyDown);
+  
+  // 智能挂载：如果有 query.id 则从 Nest 动态获取，否则加载默认示例
+  const loaded = await loadSavedTemplate();
+  if (!loaded) {
+    loadDefaultTemplate();
+  }
 });
 
 onBeforeUnmount(() => {
@@ -2095,6 +2374,26 @@ onBeforeUnmount(() => {
   color: #0f172a;
   font-family: 'Outfit', 'Inter', -apple-system, sans-serif;
   user-select: none;
+}
+
+.debug-badge-active {
+  font-size: 9.5px;
+  background-color: #ecfdf5;
+  color: #059669;
+  border: 1px solid #a7f3d0;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: bold;
+}
+
+.debug-badge-inactive {
+  font-size: 9.5px;
+  background-color: #f1f5f9;
+  color: #64748b;
+  border: 1px solid #cbd5e1;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: bold;
 }
 
 /* 顶部操作工具栏 */
@@ -2299,11 +2598,30 @@ onBeforeUnmount(() => {
 }
 
 .section-elements {
-  height: 290px;
-  flex: none;
+  height: auto;
+  max-height: 380px;
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
   border-bottom: 1px solid #e8ecf2;
+  transition: all 0.2s ease;
+}
+
+.section-elements.is-collapsed {
+  height: auto;
+  max-height: 43px;
+  overflow: hidden;
+}
+
+.section-datasource.is-collapsed {
+  flex: none !important;
+  height: 43px !important;
+  overflow: hidden;
+}
+
+.section-outline.is-collapsed {
+  height: 43px !important;
+  overflow: hidden;
 }
 
 .element-grid {

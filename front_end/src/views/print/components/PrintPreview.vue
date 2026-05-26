@@ -18,10 +18,12 @@
       </div>
     </div>
     
-    <!-- 智能测量 Loading 遮罩层 (毛玻璃质感，0.1秒排版即逝) -->
-    <div v-if="isMeasuring" class="preview-measuring-loading" style="position: absolute; top: 56px; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.95); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 99999; backdrop-filter: blur(8px);">
+    <!-- 智能测量/接口查数 Loading 遮罩层 (毛玻璃质感) -->
+    <div v-if="isMeasuring || isApiLoading" class="preview-measuring-loading" style="position: absolute; top: 56px; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.95); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 99999; backdrop-filter: blur(8px);">
       <div class="spinner" style="width: 40px; height: 40px; border: 3px solid rgba(245, 158, 11, 0.2); border-top-color: #f59e0b; border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 12px;"></div>
-      <div style="color: #94a3b8; font-size: 13px; font-weight: 500; letter-spacing: 1px;">智能物理高度排版匹配中...</div>
+      <div style="color: #94a3b8; font-size: 13px; font-weight: 500; letter-spacing: 1px;">
+        {{ isApiLoading ? '正在调用真实测试接口拉取最新业务数据...' : '智能物理高度排版匹配中...' }}
+      </div>
     </div>
 
     <!-- 预览物理纸张滚动容器 -->
@@ -132,7 +134,7 @@
                 class="el-text-render"
                 :style="getTextStyle(el)"
               >
-                {{ interpolate(`第 \${page.pageIndex} 页 / 共 \${renderPages.length} 页`, page.pageIndex, renderPages.length) }}
+                第 {{ page.pageIndex }} 页 / 共 {{ renderPages.length }} 页
               </div>
               
               <!-- 图片 -->
@@ -164,15 +166,13 @@
               ></div>
 
               <!-- 矢量二维码 -->
-              <div v-else-if="el.type === 'qrcode'" style="width: 100%; height: 100%;">
-                <svg :viewBox="`0 0 ${getQrData(el.value).size} ${getQrData(el.value).size}`" width="100%" height="100%">
-                  <path :d="getQrSvgPath(el.value)" fill="#000000" />
-                </svg>
+              <div v-else-if="el.type === 'qrcode'" style="width: 100%; height: 100%; background-color: #ffffff; padding: 4px; box-sizing: border-box; display: flex; align-items: center; justify-content: center;">
+                <img :src="getQrDataUrl(el.value)" style="width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated;" />
               </div>
 
               <!-- 矢量条形码 -->
-              <div v-else-if="el.type === 'barcode'" class="barcode-render-container">
-                <svg viewBox="0 0 115 50" width="100%" height="75%" preserveAspectRatio="none">
+              <div v-else-if="el.type === 'barcode'" class="barcode-render-container" style="background-color: #ffffff; padding: 4px; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                <svg viewBox="0 0 115 50" width="100%" height="75%" preserveAspectRatio="none" shape-rendering="crispEdges">
                   <g fill="#000000">
                     <rect 
                       v-for="(bar, idx) in getBarcodeData(el.value).bars" 
@@ -246,8 +246,9 @@
 <script setup>
 import { ref, computed, watch, onMounted, nextTick } from 'vue';
 import { mockData, reportMockData, deliveryMockData, assetMockData } from '../utils/mockData.js';
-import { QRCodeAlg } from '../utils/qrcode.js';
 import { BarcodeAlg } from '../utils/barcode.js';
+import QRCode from 'qrcode'; // 🔍 引入工业级 qrcode 库
+import service from '@/api/index'; // 🔍 引入通用 Axios 实例
 
 const props = defineProps({
   elements: {
@@ -269,6 +270,27 @@ const props = defineProps({
   isLandscape: {
     type: Boolean,
     default: false
+  },
+  runtimeData: {
+    type: Object,
+    default: () => null
+  },
+  // 🔍 接收设计器的真实测试 API 配置
+  apiPath: {
+    type: String,
+    default: ''
+  },
+  testMethod: {
+    type: String,
+    default: 'GET'
+  },
+  testParams: {
+    type: String,
+    default: '{}'
+  },
+  testBusinessId: {
+    type: String,
+    default: ''
   }
 });
 
@@ -276,8 +298,21 @@ const emit = defineEmits(['close']);
 
 const MM_TO_PX = 3.779527559; // 1mm ≈ 3.78px
 
+const fetchedData = ref(null);      // 🔍 预览组件内部静默拉取的真实业务数据
+const isApiLoading = ref(false);    // 🔍 接口拉取 Loading 状态
+
 // 自动感知选择当前模板适用的 Mock 数据源
 const activeMockData = computed(() => {
+  // 🔍 1. 组件内拉取到的真实业务数据优先
+  if (fetchedData.value) {
+    return fetchedData.value;
+  }
+  
+  // 🔍 2. 外部传入的已连通调试数据次之
+  if (props.runtimeData) {
+    return props.runtimeData;
+  }
+
   // 1. 自动感知是否包含图 3 述职报告模版特殊字段
   const hasReportKeyword = props.elements.some(el => {
     if (typeof el.value === 'string' && (el.value.includes('master.userName') || el.value.includes('master.jobTitle') || el.value.includes('master.year'))) return true;
@@ -292,8 +327,93 @@ const activeMockData = computed(() => {
     if (el.type === 'table' && el.columns && el.columns.some(col => col.field === 'detail.module')) return true;
     return false;
   });
-  return hasMergeKeyword ? mergeMockData : mockData;
+  return mockData; // 完美规避未定义 mergeMockData 带来的 ReferenceError，直接降级至 mockData
 });
+
+// 🔍 智能寻找/解析二维子表列表数据源 (支持自定义接口的任意数组结构)
+const listData = computed(() => {
+  const data = activeMockData.value;
+  if (!data) return [];
+  if (Array.isArray(data)) return data;
+  
+  // 智能寻找典型字段名
+  if (data.detail && Array.isArray(data.detail)) return data.detail;
+  if (data.records && Array.isArray(data.records)) return data.records;
+  if (data.items && Array.isArray(data.items)) return data.items;
+  
+  // 自动寻找第一个数组格式的键名 (超级通用！)
+  for (const key in data) {
+    if (Array.isArray(data[key])) {
+      return data[key];
+    }
+  }
+  return [];
+});
+
+// 🔍 核心静默数据联调查数引擎：在预览组件内自动匹配并请求配置的真实后台数据
+const fetchRealBusinessData = async () => {
+  if (!props.apiPath || !props.apiPath.trim()) return;
+  
+  isApiLoading.value = true;
+  try {
+    const rawPath = props.apiPath.trim();
+    
+    // 解析高级参数 JSON 字符串
+    let customParams = {};
+    if (props.testParams && props.testParams.trim()) {
+      try {
+        customParams = JSON.parse(props.testParams.trim());
+      } catch (e) {
+        console.error('PrintPreview JSON parse error:', e);
+      }
+    }
+    
+    // 注入用户配置的调试物理业务 ID
+    if (props.testBusinessId && props.testBusinessId.trim()) {
+      customParams.id = props.testBusinessId.trim();
+      customParams.businessId = props.testBusinessId.trim();
+    }
+    
+    let finalUrl = rawPath;
+    let res = null;
+    
+    // 智能识别 restful 风格路由参数占位符如 /api/detail/{id}
+    if (props.testBusinessId && props.testBusinessId.trim() && finalUrl.includes('{id}')) {
+      finalUrl = finalUrl.replace('{id}', props.testBusinessId.trim());
+    }
+    
+    if (props.testMethod === 'POST') {
+      console.log(`[PrintPreview POST] Requesting: ${finalUrl}`, customParams);
+      res = await service.post(finalUrl, customParams);
+    } else {
+      // GET 请求：把所有参数序列化拼接为 Query string
+      const queryParts = [];
+      for (const [key, val] of Object.entries(customParams)) {
+        if (rawPath.includes('{id}') && (key === 'id' || key === 'businessId')) {
+          continue;
+        }
+        queryParts.push(`${encodeURIComponent(key)}=${encodeURIComponent(val)}`);
+      }
+      if (queryParts.length > 0) {
+        finalUrl = `${finalUrl}${finalUrl.includes('?') ? '&' : '?'}${queryParts.join('&')}`;
+      }
+      console.log(`[PrintPreview GET] Requesting: ${finalUrl}`);
+      res = await service.get(finalUrl);
+    }
+    
+    if (res) {
+      fetchedData.value = res;
+      console.log('[PrintPreview] Fetch business data success:', res);
+    } else {
+      console.warn('[PrintPreview] Fetch returned empty data');
+    }
+  } catch (err) {
+    console.error('[PrintPreview] Failed to fetch real data:', err);
+    window.$message?.error(`预览自动获取真实数据失败: ${err.message || '请检查跨域限制或接口是否正常'}`);
+  } finally {
+    isApiLoading.value = false;
+  }
+};
 
 // 智能估计表格行物理高度 (根据文字长度及实际表格拉伸宽度比例进行物理精细推算)
 function getEstimatedRowHeight(row, columns, tableWidth = 0) {
@@ -346,7 +466,7 @@ function shouldRenderColumn(columns, cIdx) {
 // 核心分页排版引擎 (基于动态物理高度累加的流式行切割)
 const renderPages = computed(() => {
   const pages = [];
-  const listData = activeMockData.value.detail; // 获取从表二维列表数据
+  const listDataVal = listData.value; // 获取从表二维列表数据
   
   // 1. 获取表格组件
   const tableElement = props.elements.find(el => el.type === 'table');
@@ -387,7 +507,7 @@ const renderPages = computed(() => {
   let curPageIndex = 1;
   const segments = []; // 存储切分好后的每页表格行数据
   
-  while (currentDataIndex < listData.length) {
+  while (currentDataIndex < listDataVal.length) {
     const isFirstPage = curPageIndex === 1;
     const maxTableH = isFirstPage ? page1MaxTableHeight : pageNMaxTableHeight;
     const showHeader = isFirstPage ? true : tableElement.repeatHeader !== false;
@@ -397,8 +517,8 @@ const renderPages = computed(() => {
     let currentTableH = usedForHeader;
     const pageRows = [];
     
-    while (currentDataIndex < listData.length) {
-      const row = listData[currentDataIndex];
+    while (currentDataIndex < listDataVal.length) {
+      const row = listDataVal[currentDataIndex];
       const estimatedH = getEstimatedRowHeight(row, tableElement.columns, tableElement.width);
       
       // 如果加上当前行高度后超出了本页可用高度，且本页已经塞入了至少一行数据，则推到下一页
@@ -456,7 +576,6 @@ const finalPages = ref(renderPages.value || []);
 const measureTableRef = ref(null);
 const measureTheadRef = ref(null);
 
-const listData = computed(() => activeMockData.value.detail || []);
 const tableElement = computed(() => props.elements.find(el => el.type === 'table'));
 
 const measureAndPaginate = async () => {
@@ -571,7 +690,11 @@ const measureAndPaginate = async () => {
 };
 
 // 触发钩子
-onMounted(() => {
+onMounted(async () => {
+  // 🔍 预览入口：自动调接口加载真实数据并执行排版
+  if (props.apiPath && props.apiPath.trim()) {
+    await fetchRealBusinessData();
+  }
   measureAndPaginate();
 });
 
@@ -760,26 +883,22 @@ const getBarcodeData = (value) => {
   }
 };
 
-const getQrData = (value) => {
-  const val = interpolate(value, 1, 1);
-  try {
-    return QRCodeAlg.generate(val || "SO-20260524");
-  } catch (e) {
-    return { size: 21, matrix: [] };
+const qrCache = ref({});
+// 🔍 采用工业级 qrcode 库异步渲染出高分辨率 Base64 二维码图片
+const getQrDataUrl = (value) => {
+  const val = interpolate(value, 1, 1) || "SO-20260524";
+  if (qrCache.value[val]) {
+    return qrCache.value[val];
   }
-};
-
-const getQrSvgPath = (value) => {
-  const qr = getQrData(value);
-  let path = "";
-  for (let r = 0; r < qr.size; r++) {
-    for (let c = 0; c < qr.size; c++) {
-      if (qr.matrix[r][c]) {
-        path += `M${c} ${r}h1v1h-1z`;
-      }
-    }
-  }
-  return path;
+  
+  qrCache.value[val] = ''; // 占位符
+  QRCode.toDataURL(val, { margin: 1, width: 256 }).then(url => {
+    qrCache.value[val] = url;
+  }).catch(err => {
+    console.error('QR code generation failed:', err);
+  });
+  
+  return qrCache.value[val];
 };
 
 // 调起物理隔离打印 (彻底避开管理系统框架干扰，实现纯净矢量打印)

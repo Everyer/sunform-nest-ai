@@ -10,4 +10,5 @@ export * from './component.entity';
 // 低代码日志实体
 export * from './lowcode-log.entity';
 export * from './lowcode.entity';
-export * from './config.entity'; 
+export * from './config.entity';
+export * from './print-template.entity'; 

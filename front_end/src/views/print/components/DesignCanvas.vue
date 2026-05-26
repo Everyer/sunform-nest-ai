@@ -75,15 +75,13 @@
         ></div>
 
         <!-- 二维码组件 -->
-        <div v-else-if="el.type === 'qrcode'" class="el-content el-qrcode">
-          <svg :viewBox="`0 0 ${getQrData(el.value).size} ${getQrData(el.value).size}`" width="100%" height="100%">
-            <path :d="getQrSvgPath(el.value)" fill="#000000" />
-          </svg>
+        <div v-else-if="el.type === 'qrcode'" class="el-content el-qrcode" style="background-color: #ffffff; display: flex; align-items: center; justify-content: center;">
+          <img :src="getQrDataUrl(el.value)" style="width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated;" />
         </div>
 
         <!-- 条形码组件 -->
-        <div v-else-if="el.type === 'barcode'" class="el-content el-barcode">
-          <svg viewBox="0 0 115 50" width="100%" height="100%" preserveAspectRatio="none">
+        <div v-else-if="el.type === 'barcode'" class="el-content el-barcode" style="background-color: #ffffff;">
+          <svg viewBox="0 0 115 50" width="100%" height="100%" preserveAspectRatio="none" shape-rendering="crispEdges">
             <g fill="#000000">
               <rect 
                 v-for="(bar, idx) in getBarcodeData(el.value).bars" 
@@ -267,8 +265,8 @@
 
 <script setup>
 import { ref, computed } from 'vue';
-import { QRCodeAlg } from '../utils/qrcode.js';
 import { BarcodeAlg } from '../utils/barcode.js';
+import QRCode from 'qrcode'; // 🔍 引入工业级 qrcode 库
 
 const props = defineProps({
   elements: {
@@ -821,27 +819,22 @@ const getBarcodeData = (value) => {
   }
 };
 
-// 生成二维码点阵
-const getQrData = (value) => {
-  try {
-    return QRCodeAlg.generate(value || "SO-20260524");
-  } catch (e) {
-    return { size: 21, matrix: [] };
+const qrCache = ref({});
+// 🔍 采用工业级 qrcode 库异步渲染出高分辨率 Base64 二维码图片
+const getQrDataUrl = (value) => {
+  const val = value || "SO-20260524";
+  if (qrCache.value[val]) {
+    return qrCache.value[val];
   }
-};
-
-// 将二维码 0/1 点阵绘制为 SVG 路径字符串，提高大渲染效率
-const getQrSvgPath = (value) => {
-  const qr = getQrData(value);
-  let path = "";
-  for (let r = 0; r < qr.size; r++) {
-    for (let c = 0; c < qr.size; c++) {
-      if (qr.matrix[r][c]) {
-        path += `M${c} ${r}h1v1h-1z`; // 绘制一个像素块
-      }
-    }
-  }
-  return path;
+  
+  qrCache.value[val] = ''; // 占位符
+  QRCode.toDataURL(val, { margin: 1, width: 256 }).then(url => {
+    qrCache.value[val] = url;
+  }).catch(err => {
+    console.error('QR code generation failed:', err);
+  });
+  
+  return qrCache.value[val];
 };
 
 // 组件元素样式
