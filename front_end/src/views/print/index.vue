@@ -97,54 +97,46 @@
           
           <!-- 数据源绑定列表 -->
           <section class="section-datasource">
-            <h3 class="panel-title">主从数据源</h3>
-            <div class="data-tree">
-              <!-- 主表单值字段 -->
-              <div class="tree-group">
-                <div class="tree-header">
-                  <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                    <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10H7v-2h10v2zm0-4H7V7h10v2zm0 8H7v-2h10v2z"/>
-                  </svg>
-                  <span>主表字段 (Master)</span>
-                </div>
-                <div class="tree-children">
-                  <div 
-                    v-for="field in schema.master" 
-                    :key="field.key"
-                    class="tree-node"
-                    title="点击复制变量，或双击在当前选中文本组件插入"
-                    @click="copyVariable(`\${master.${field.key}}`)"
-                    @dblclick="insertVariableToActive(`\${master.${field.key}}`)"
-                  >
-                    <span class="node-key">${master.{{ field.key }}}</span>
-                    <span class="node-label">{{ field.label }}</span>
-                  </div>
-                </div>
-              </div>
-              
-              <!-- 从表/明细字段 -->
-              <div class="tree-group">
-                <div class="tree-header">
-                  <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                    <path d="M3 15h18v-2H3v2zm0 4h18v-2H3v2zm0-8h18V9H3v2zm0-6v2h18V5H3z"/>
-                  </svg>
-                  <span>从表明细字段 (Detail)</span>
-                </div>
-                <div class="tree-children">
-                  <div 
-                    v-for="field in schema.detail" 
-                    :key="field.key"
-                    class="tree-node"
-                    title="供表格中绑定为列字段"
-                    @click="copyVariable(`detail.${field.key}`)"
-                  >
-                    <span class="node-key">detail.{{ field.key }}</span>
-                    <span class="node-label">{{ field.label }}</span>
-                  </div>
+            <h3 class="panel-title" style="display: flex; align-items: center; justify-content: space-between;">
+              <span>📂 万能 JSON 变量数据树</span>
+              <span style="font-size: 10px; color: #10b981; font-weight: normal; text-transform: none;">自动匹配模板</span>
+            </h3>
+            <div class="data-tree" style="padding: 10px 12px; overflow-y: auto; flex: 1;">
+              <div 
+                v-for="(node, index) in treeNodes" 
+                :key="index"
+                class="tree-node"
+                :style="{
+                  padding: '5px 8px',
+                  borderRadius: '6px',
+                  marginBottom: '3px',
+                  transition: 'all 0.15s ease',
+                  backgroundColor: node.isGroup ? '#f8fafc' : node.isList ? '#eff6ff' : 'transparent',
+                  paddingLeft: node.isSub ? '24px' : node.isGroup ? '8px' : '12px',
+                  cursor: node.isGroup ? 'default' : 'pointer'
+                }"
+                :title="node.isGroup ? '对象容器' : '双击自动插入当前选中的文本组件中，单选点击复制变量路径'"
+                @click="!node.isGroup && copyVariable(node.path)"
+                @dblclick="!node.isGroup && insertVariableToActive(node.path)"
+              >
+                <div style="display: flex; flex-direction: column; gap: 1px;">
+                  <span class="node-key" :style="{ 
+                    fontSize: '11px', 
+                    fontFamily: 'monospace',
+                    color: node.isList ? '#2563eb' : node.isSub ? '#10b981' : node.isGroup ? '#64748b' : '#d97706',
+                    fontWeight: node.isGroup || node.isList ? 'bold' : 'normal'
+                  }">
+                    {{ node.path }}
+                  </span>
+                  <span class="node-label" style="font-size: 10px; color: #64748b; margin-top: 1px;">
+                    {{ node.label }}
+                  </span>
                 </div>
               </div>
             </div>
-            <div class="datasource-tips">提示：点击节点可复制变量；双击主表字段可在选中的文本组件中直接插入。</div>
+            <div class="datasource-tips" style="font-size: 10.5px; line-height: 1.5; color: #64748b; background-color: #f8fafc; border-top: 1px solid #e8ecf2; padding: 10px 14px;">
+              💡 <b>温馨提示：</b>单击树中任意节点即可<b>一键复制变量路径</b>；双击即可直接<b>插入至画布中文本框光标后</b>，开发效率极高！
+            </div>
           </section>
 
           <!-- 图层大纲 -->
@@ -405,8 +397,13 @@
                 <div v-show="activeElement.type === 'table'">
                   <div class="prop-section-title">表格属性与合并网格</div>
                   
+                  <div class="form-item" style="margin-top: 8px;">
+                    <label>数据源列表路径 (绑定如: detail, data.list, a.b.c)</label>
+                    <input type="text" v-model="activeElement.dataSourcePath" placeholder="例如: detail" style="width: 100%; padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px;" />
+                  </div>
+
                   <div class="form-item">
-                    <label class="checkbox-label">
+                    <label class="checkbox-label" style="margin-top: 6px;">
                       <input type="checkbox" v-model="activeElement.repeatHeader" />
                       <span>表格跨页时，每页重复显示表头 (Header Repeat)</span>
                     </label>
@@ -582,16 +579,8 @@
                       </div>
                       <div class="form-row-2">
                         <div class="form-item">
-                          <label>绑定子字段</label>
-                          <select v-model="col.field">
-                            <option 
-                              v-for="f in schema.detail" 
-                              :key="f.key" 
-                              :value="`detail.${f.key}`"
-                            >
-                              {{ f.label }}
-                            </option>
-                          </select>
+                          <label>绑定子字段 (如: name, goodsName, a.b)</label>
+                          <input type="text" v-model="col.field" placeholder="例如: goodsName" />
                         </div>
                         <div class="form-item">
                           <label>对齐</label>
@@ -638,6 +627,23 @@
             <!-- Tab 2: 页面设置 -->
             <div v-show="activeTab === 'page'" class="tab-panel">
               <div class="property-form">
+                <div class="prop-section-title">模板基础绑定信息</div>
+                <div class="form-item">
+                  <label>模板唯一标识 (Template ID)</label>
+                  <input type="text" v-model="templateId" placeholder="模板唯一代码，例如 tpl_sales_order" />
+                  <p class="field-desc-text">通常用于前端组件或后端接口拉取此模板配置的 Key。</p>
+                </div>
+                <div class="form-item">
+                  <label>模板名称</label>
+                  <input type="text" v-model="templateName" placeholder="例如：标准销售订单打印模板" />
+                </div>
+                <div class="form-item">
+                  <label>🔗 关联业务详情/列表接口 (apiPath)</label>
+                  <input type="text" v-model="apiPath" placeholder="例如：/api/v1/sales/order/detail" />
+                  <p class="field-desc-text">运行时，根据此 apiPath 及传入的 businessId 动态反射拉取 JSON 数据。</p>
+                </div>
+
+                <div class="prop-divider"></div>
                 <div class="prop-section-title">纸张规格属性</div>
                 <div class="form-item">
                   <label>纸张预设</label>
@@ -782,7 +788,7 @@ import { ref, reactive, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import Ruler from './components/Ruler.vue';
 import DesignCanvas from './components/DesignCanvas.vue';
 import PrintPreview from './components/PrintPreview.vue';
-import { schema } from './utils/mockData.js';
+import { mockData, reportMockData, deliveryMockData, assetMockData } from './utils/mockData.js';
 
 defineOptions({ name: "ReportPrintDesigner" });
 
@@ -807,6 +813,12 @@ const showGrid = ref(true);
 const snapToGrid = ref(true);
 const gridSize = ref(5); // 网格大小 5mm
 
+// 🔑 模板元数据与通用绑定接口设置
+const templateId = ref('tpl_' + Math.random().toString(36).substr(2, 9));
+const templateName = ref('未命名打印模板');
+const apiPath = ref('/api/v1/business/detail'); // 默认绑定的万能业务详情接口
+
+
 // 页面边距设置 (单位：毫米)
 const pageMargins = reactive({
   top: 10,
@@ -822,6 +834,87 @@ const activeTab = ref('style');
 // 选中的组件对象
 const activeElement = computed(() => {
   return elements.value.find(item => item.id === activeId.value);
+});
+
+// 🔑 自动感知当前模板适用的 Mock 数据源 (与 PrintPreview 保持完全同步！)
+const activeMockData = computed(() => {
+  const hasReportKeyword = elements.value.some(el => {
+    if (typeof el.value === 'string' && (el.value.includes('info.') || el.value.includes('records'))) return true;
+    if (el.type === 'table' && el.dataSourcePath === 'records') return true;
+    return false;
+  });
+  if (hasReportKeyword) return reportMockData;
+
+  const hasDeliveryKeyword = elements.value.some(el => {
+    if (typeof el.value === 'string' && (el.value.includes('company.') || el.value.includes('deliveryCode') || el.value.includes('items'))) return true;
+    if (el.type === 'table' && el.dataSourcePath === 'items') return true;
+    return false;
+  });
+  if (hasDeliveryKeyword) return deliveryMockData;
+
+  const hasAssetKeyword = elements.value.some(el => {
+    if (typeof el.value === 'string' && (el.value.includes('assetName') || el.value.includes('keeperDept') || el.value.includes('assetCode'))) return true;
+    return false;
+  });
+  if (hasAssetKeyword) return assetMockData;
+
+  return mockData;
+});
+
+// 🔑 通用递归算法：把任何深层嵌套 JSON 扁平化为带层级路径的数据树节点列表，支持用户一键复制！
+const treeNodes = computed(() => {
+  const nodes = [];
+  
+  function recurse(obj, parentPath = '') {
+    if (!obj || typeof obj !== 'object') return;
+    
+    // 如果是数组，直接显示为明细表格支持绑定的行字段示例，避免无限递归
+    if (Array.isArray(obj)) {
+      if (obj.length > 0) {
+        // 取数组第一个元素作为字段示例
+        const firstItem = obj[0];
+        nodes.push({
+          path: parentPath,
+          label: `[列表数据源] - 共有 ${obj.length} 条记录`,
+          isList: true
+        });
+        // 遍历数组下子字段
+        for (const [key, val] of Object.entries(firstItem)) {
+          nodes.push({
+            path: key, // 明细列只需写字段名相对路径，例如 goodsName
+            label: `┗━━ [列属性] 示例值: ${val}`,
+            isSub: true
+          });
+        }
+      }
+      return;
+    }
+    
+    // 递归对象键值
+    for (const [key, val] of Object.entries(obj)) {
+      const currentPath = parentPath ? `${parentPath}.${key}` : key;
+      if (val && typeof val === 'object' && !Array.isArray(val)) {
+        nodes.push({
+          path: currentPath,
+          label: `📁 [对象] ${key}`,
+          isGroup: true
+        });
+        recurse(val, currentPath);
+      } else if (!Array.isArray(val)) {
+        nodes.push({
+          path: `\${${currentPath}}`, // 插值表达式完整占位符
+          label: `📄 [文本值] ${key}: ${val}`,
+          isField: true
+        });
+      } else {
+        // 如果是明细列表
+        recurse(val, currentPath);
+      }
+    }
+  }
+  
+  recurse(activeMockData.value);
+  return nodes;
 });
 
 // 标尺及视口大小计算
@@ -1357,7 +1450,7 @@ const loadReportDemoTemplate = () => {
       id: 'el_title_report',
       type: 'text',
       x: mmToPx(10), y: mmToPx(10), width: mmToPx(190), height: mmToPx(10),
-      value: '（ 2025 ） 年度述职报告',
+      value: '（ ${info.year} ） 年度述职报告',
       fontSize: 20, fontColor: '#0c1832', fontWeight: 'bold', align: 'center', valign: 'middle', showStrategy: 'all'
     },
     {
@@ -1374,24 +1467,25 @@ const loadReportDemoTemplate = () => {
       type: 'table',
       x: mmToPx(10), y: mmToPx(26), width: mmToPx(190), height: mmToPx(250),
       repeatHeader: true,
+      dataSourcePath: 'records', // 🔑 绑定列表数据源到嵌套路径 'records' 上！
       columns: [
-        { title: '大类分类', field: 'detail.category', width: 56, align: 'center', autoMerge: true, writingMode: 'vertical-rl' }, // 竖排汉字，自动行合并！
-        { title: '序号', field: 'detail.index', width: 45, align: 'center', autoMerge: false },
-        { title: '完成事项内容', field: 'detail.content', width: 230, align: 'left', autoMerge: false },
-        { title: '亮点/成果', field: 'detail.achievements', width: 95, align: 'left', autoMerge: false, colspan: 3 }, // 亮点成果跨 3 列
+        { title: '大类分类', field: 'category', width: 56, align: 'center', autoMerge: true, writingMode: 'vertical-rl' }, // 竖排汉字，自动行合并！
+        { title: '序号', field: 'index', width: 45, align: 'center', autoMerge: false },
+        { title: '完成事项内容', field: 'content', width: 230, align: 'left', autoMerge: false },
+        { title: '亮点/成果', field: 'achievements', width: 95, align: 'left', autoMerge: false, colspan: 3 }, // 亮点成果跨 3 列
         { title: '', field: '', width: 120, align: 'left', autoMerge: false }, // 隐藏列
         { title: '', field: '', width: 95, align: 'left', autoMerge: false },  // 隐藏列
-        { title: '完成时间', field: 'detail.finishTime', width: 77, align: 'center', autoMerge: false }
+        { title: '完成时间', field: 'finishTime', width: 77, align: 'center', autoMerge: false }
       ],
       headerRows: [
         [
           { title: '个人信息', rowspan: 2, colspan: 1, align: 'center', backgroundColor: '#eff6ff', fontWeight: 'bold' },
           { title: '部门', rowspan: 1, colspan: 1, align: 'center', backgroundColor: '#eff6ff', fontWeight: 'bold' },
-          { title: '${master.department}', rowspan: 1, colspan: 1, align: 'center' },
+          { title: '${info.deptName}', rowspan: 1, colspan: 1, align: 'center' },
           { title: '职务', rowspan: 1, colspan: 1, align: 'center', backgroundColor: '#eff6ff', fontWeight: 'bold' },
-          { title: '${master.jobTitle}', rowspan: 1, colspan: 1, align: 'center' },
+          { title: '${info.title}', rowspan: 1, colspan: 1, align: 'center' },
           { title: '姓名', rowspan: 1, colspan: 1, align: 'center', backgroundColor: '#eff6ff', fontWeight: 'bold' },
-          { title: '${master.userName}', rowspan: 1, colspan: 1, align: 'center' }
+          { title: '${info.author}', rowspan: 1, colspan: 1, align: 'center' }
         ],
         [
           { title: '序号', rowspan: 1, colspan: 1, align: 'center', backgroundColor: '#eff6ff', fontWeight: 'bold' },
@@ -1464,7 +1558,7 @@ const loadLandscapeDeliveryTemplate = () => {
       id: 'el_val1_deliv',
       type: 'text',
       x: mmToPx(28), y: mmToPx(29), width: mmToPx(60), height: mmToPx(6),
-      value: '${master.customerName}',
+      value: '${company.clientName}', // 🔑 嵌套路径
       fontSize: 10, fontColor: '#0f172a', align: 'left', valign: 'middle', showStrategy: 'first'
     },
     {
@@ -1478,7 +1572,7 @@ const loadLandscapeDeliveryTemplate = () => {
       id: 'el_val2_deliv',
       type: 'text',
       x: mmToPx(113), y: mmToPx(29), width: mmToPx(50), height: mmToPx(6),
-      value: '${master.orderNo}',
+      value: '${deliveryCode}',
       fontSize: 10, fontColor: '#0f172a', align: 'left', valign: 'middle', showStrategy: 'first'
     },
     {
@@ -1492,13 +1586,13 @@ const loadLandscapeDeliveryTemplate = () => {
       id: 'el_val3_deliv',
       type: 'text',
       x: mmToPx(188), y: mmToPx(29), width: mmToPx(40), height: mmToPx(6),
-      value: '${master.contactPhone}',
+      value: '${company.clientPhone}', // 🔑 嵌套路径
       fontSize: 10, fontColor: '#0f172a', align: 'left', valign: 'middle', showStrategy: 'first'
     },
     {
       id: 'el_lbl4_deliv',
       type: 'text',
-      x: mmToPx(235), y: mmToPx(29), width: mmToPx(15), height: mmToPx(6),
+      x: mmToPx(235), y: mmToPx(15), height: mmToPx(6),
       value: '经手：',
       fontSize: 10, fontColor: '#475569', fontWeight: 'bold', align: 'left', valign: 'middle', showStrategy: 'first'
     },
@@ -1506,7 +1600,7 @@ const loadLandscapeDeliveryTemplate = () => {
       id: 'el_val4_deliv',
       type: 'text',
       x: mmToPx(248), y: mmToPx(29), width: mmToPx(30), height: mmToPx(6),
-      value: '${master.salesperson}',
+      value: '${operator}',
       fontSize: 10, fontColor: '#0f172a', align: 'left', valign: 'middle', showStrategy: 'first'
     },
     
@@ -1524,14 +1618,15 @@ const loadLandscapeDeliveryTemplate = () => {
       type: 'table',
       x: mmToPx(10), y: mmToPx(40), width: mmToPx(277), height: mmToPx(100),
       repeatHeader: true,
+      dataSourcePath: 'items', // 🔑 绑定列表数据源到嵌套路径 'items' 上！
       columns: [
-        { title: '序号', field: 'detail.index', width: 45, align: 'center' },
-        { title: '配送商品及规格说明', field: 'detail.goodsName', width: 380, align: 'left' },
-        { title: '数量', field: 'detail.quantity', width: 75, align: 'right' },
-        { title: '物理单位', field: 'detail.unit', width: 75, align: 'center' },
-        { title: '单价 (元)', field: 'detail.price', width: 105, align: 'right' },
-        { title: '发货金额', field: 'detail.amount', width: 120, align: 'right' },
-        { title: '配送追踪码', field: 'detail.goodsCode', width: 155, align: 'center' }
+        { title: '序号', field: 'index', width: 45, align: 'center' },
+        { title: '配送商品及规格说明', field: 'desc', width: 380, align: 'left' },
+        { title: '数量', field: 'qty', width: 75, align: 'right' },
+        { title: '物理单位', field: 'unit', width: 75, align: 'center' },
+        { title: '单价 (元)', field: 'price', width: 105, align: 'right' },
+        { title: '发货金额', field: 'amount', width: 120, align: 'right' },
+        { title: '配送追踪码', field: 'trackingCode', width: 155, align: 'center' }
       ],
       showStrategy: 'all'
     },
@@ -1541,7 +1636,7 @@ const loadLandscapeDeliveryTemplate = () => {
       id: 'el_stamp_deliv',
       type: 'text',
       x: mmToPx(210), y: mmToPx(142), width: mmToPx(35), height: mmToPx(35),
-      value: '【已发货】',
+      value: '${stampText}',
       fontSize: 18, fontColor: '#ef4444', fontWeight: 'bold', align: 'center', valign: 'middle', showStrategy: 'last'
     },
     
@@ -1549,14 +1644,14 @@ const loadLandscapeDeliveryTemplate = () => {
     {
       id: 'el_sum1_deliv',
       type: 'text',
-      x: mmToPx(10), y: mmToPx(148), width: mmToPx(50), height: mmToPx(6),
-      value: '价税应收总计： ￥${master.grandTotal}',
+      x: mmToPx(10), y: mmToPx(148), width: mmToPx(100), height: mmToPx(6),
+      value: '价税应收总计： ￥${summary.cashAmount}',
       fontSize: 11, fontColor: '#1e3a8a', fontWeight: 'bold', align: 'left', valign: 'middle', showStrategy: 'last'
     },
     {
       id: 'el_sum2_deliv',
       type: 'text',
-      x: mmToPx(70), y: mmToPx(148), width: mmToPx(60), height: mmToPx(6),
+      x: mmToPx(120), y: mmToPx(148), width: mmToPx(100), height: mmToPx(6),
       value: '收货人签收回执（盖章）： __________________',
       fontSize: 10, fontColor: '#475569', align: 'left', valign: 'middle', showStrategy: 'last'
     },
@@ -1614,7 +1709,7 @@ const loadAssetTagTemplate = () => {
       id: 'el_val1_asset',
       type: 'text',
       x: mmToPx(34), y: mmToPx(24), width: mmToPx(90), height: mmToPx(6),
-      value: '智能路由核心交换机 Node-04',
+      value: '${assetName}', // 🔑 绑定打平后的嵌套字段
       fontSize: 10, fontColor: '#0f172a', align: 'left', valign: 'middle', showStrategy: 'all'
     },
     {
@@ -1628,7 +1723,7 @@ const loadAssetTagTemplate = () => {
       id: 'el_val2_asset',
       type: 'text',
       x: mmToPx(34), y: mmToPx(32), width: mmToPx(90), height: mmToPx(6),
-      value: '${master.department}',
+      value: '${keeperDept}', // 🔑 绑定打平后的嵌套字段
       fontSize: 10, fontColor: '#0f172a', align: 'left', valign: 'middle', showStrategy: 'all'
     },
     {
@@ -1642,7 +1737,7 @@ const loadAssetTagTemplate = () => {
       id: 'el_val3_asset',
       type: 'text',
       x: mmToPx(34), y: mmToPx(40), width: mmToPx(90), height: mmToPx(6),
-      value: '${master.orderNo}',
+      value: '${assetCode}', // 🔑 绑定打平后的嵌套字段
       fontSize: 10, fontColor: '#0c1832', fontWeight: 'bold', align: 'left', valign: 'middle', showStrategy: 'all'
     },
     
@@ -1659,7 +1754,7 @@ const loadAssetTagTemplate = () => {
       id: 'el_barcode_asset',
       type: 'barcode',
       x: mmToPx(26), y: mmToPx(54), width: mmToPx(96), height: mmToPx(20),
-      value: '${master.orderNo}',
+      value: '${assetCode}',
       showText: true,
       showStrategy: 'all'
     },
@@ -1669,7 +1764,7 @@ const loadAssetTagTemplate = () => {
       id: 'el_desc_asset',
       type: 'text',
       x: mmToPx(8), y: mmToPx(78), width: mmToPx(132), height: mmToPx(10),
-      value: '注意：固定资产管理卡片，请贴于设备醒目侧面位置，妥善保管，防潮防火。',
+      value: '${warnTips}',
       fontSize: 8.5, fontColor: '#ef4444', align: 'center', valign: 'middle', showStrategy: 'all'
     },
     
@@ -1731,7 +1826,7 @@ const loadDefaultTemplate = () => {
       id: 'el_val_cust',
       type: 'text',
       x: mmToPx(30), y: mmToPx(30), width: mmToPx(80), height: mmToPx(6),
-      value: '${master.customerName}',
+      value: '${customer.name}', // 🔑 嵌套路径
       fontSize: 10, fontColor: '#0f172a', align: 'left', valign: 'middle', showStrategy: 'first'
     },
     {
@@ -1745,7 +1840,7 @@ const loadDefaultTemplate = () => {
       id: 'el_val_orderno',
       type: 'text',
       x: mmToPx(140), y: mmToPx(30), width: mmToPx(50), height: mmToPx(6),
-      value: '${master.orderNo}',
+      value: '${orderNo}',
       fontSize: 10, fontColor: '#0f172a', align: 'left', valign: 'middle', showStrategy: 'first'
     },
 
@@ -1761,7 +1856,7 @@ const loadDefaultTemplate = () => {
       id: 'el_val_contact',
       type: 'text',
       x: mmToPx(30), y: mmToPx(37), width: mmToPx(80), height: mmToPx(6),
-      value: '${master.contactPerson}',
+      value: '${customer.contact}', // 🔑 嵌套路径
       fontSize: 10, fontColor: '#0f172a', align: 'left', valign: 'middle', showStrategy: 'first'
     },
     {
@@ -1775,7 +1870,7 @@ const loadDefaultTemplate = () => {
       id: 'el_val_date',
       type: 'text',
       x: mmToPx(140), y: mmToPx(37), width: mmToPx(50), height: mmToPx(6),
-      value: '${master.createDate}',
+      value: '${createDate}',
       fontSize: 10, fontColor: '#0f172a', align: 'left', valign: 'middle', showStrategy: 'first'
     },
 
@@ -1791,7 +1886,7 @@ const loadDefaultTemplate = () => {
       id: 'el_val_phone',
       type: 'text',
       x: mmToPx(30), y: mmToPx(44), width: mmToPx(80), height: mmToPx(6),
-      value: '${master.contactPhone}',
+      value: '${customer.phone}', // 🔑 嵌套路径
       fontSize: 10, fontColor: '#0f172a', align: 'left', valign: 'middle', showStrategy: 'first'
     },
     {
@@ -1805,7 +1900,7 @@ const loadDefaultTemplate = () => {
       id: 'el_val_sales',
       type: 'text',
       x: mmToPx(140), y: mmToPx(44), width: mmToPx(50), height: mmToPx(6),
-      value: '${master.salesperson}',
+      value: '${salesperson}',
       fontSize: 10, fontColor: '#0f172a', align: 'left', valign: 'middle', showStrategy: 'first'
     },
 
@@ -1823,12 +1918,13 @@ const loadDefaultTemplate = () => {
       type: 'table',
       x: mmToPx(10), y: mmToPx(58), width: mmToPx(190), height: mmToPx(120), // 初始高度
       repeatHeader: true,
+      dataSourcePath: 'detail', // 🔑 绑定列表数据源到嵌套路径 'detail' 上！
       columns: [
-        { title: '序号', field: 'detail.index', width: 45, align: 'center' },
-        { title: '商品名称', field: 'detail.goodsName', width: 280, align: 'left' },
-        { title: '数量', field: 'detail.quantity', width: 65, align: 'right' },
-        { title: '单价', field: 'detail.price', width: 100, align: 'right' },
-        { title: '金额', field: 'detail.amount', width: 110, align: 'right' }
+        { title: '序号', field: 'index', width: 45, align: 'center' },
+        { title: '商品名称', field: 'goodsName', width: 280, align: 'left' },
+        { title: '数量', field: 'quantity', width: 65, align: 'right' },
+        { title: '单价', field: 'price', width: 100, align: 'right' },
+        { title: '金额', field: 'amount', width: 110, align: 'right' }
       ],
       showStrategy: 'all'
     },
@@ -1845,7 +1941,7 @@ const loadDefaultTemplate = () => {
       id: 'el_val_total',
       type: 'text',
       x: mmToPx(160), y: mmToPx(185), width: mmToPx(40), height: mmToPx(6),
-      value: '￥${master.totalAmount}',
+      value: '￥${financial.totalAmount}', // 🔑 嵌套路径
       fontSize: 11, fontColor: '#0c1832', fontWeight: 'bold', align: 'right', valign: 'middle', showStrategy: 'last'
     },
     {
@@ -1859,7 +1955,7 @@ const loadDefaultTemplate = () => {
       id: 'el_val_tax',
       type: 'text',
       x: mmToPx(160), y: mmToPx(192), width: mmToPx(40), height: mmToPx(6),
-      value: '￥${master.taxAmount}',
+      value: '￥${financial.taxAmount}', // 🔑 嵌套路径
       fontSize: 11, fontColor: '#0c1832', fontWeight: 'bold', align: 'right', valign: 'middle', showStrategy: 'last'
     },
     {
@@ -1873,7 +1969,7 @@ const loadDefaultTemplate = () => {
       id: 'el_val_grand',
       type: 'text',
       x: mmToPx(160), y: mmToPx(200), width: mmToPx(40), height: mmToPx(7),
-      value: '￥${master.grandTotal}',
+      value: '￥${financial.grandTotal}', // 🔑 嵌套路径
       fontSize: 13, fontColor: '#d97706', fontWeight: 'bold', align: 'right', valign: 'middle', showStrategy: 'last'
     },
 
@@ -1882,14 +1978,14 @@ const loadDefaultTemplate = () => {
       id: 'el_qrcode_foot',
       type: 'qrcode',
       x: mmToPx(10), y: mmToPx(182), width: mmToPx(24), height: mmToPx(24),
-      value: '${master.orderNo}',
+      value: '${orderNo}',
       showStrategy: 'last'
     },
     {
       id: 'el_barcode_foot',
       type: 'barcode',
       x: mmToPx(38), y: mmToPx(185), width: mmToPx(55), height: mmToPx(18),
-      value: '${master.orderNo}',
+      value: '${orderNo}',
       showText: true,
       showStrategy: 'last'
     },
@@ -1913,9 +2009,22 @@ const loadDefaultTemplate = () => {
 
 const saveTemplate = () => {
   try {
-    const templateData = JSON.stringify(elements.value, null, 2);
+    const templatePayload = {
+      templateId: templateId.value,
+      templateName: templateName.value,
+      apiPath: apiPath.value,
+      paperSizePreset: paperSizePreset.value,
+      paperWidth: paperWidth.value,
+      paperHeight: paperHeight.value,
+      isLandscape: isLandscape.value,
+      gridSize: gridSize.value,
+      pageMargins: { ...pageMargins },
+      elements: elements.value
+    };
+    
+    const templateData = JSON.stringify(templatePayload, null, 2);
     localStorage.setItem('report-print-template', templateData);
-    alert('模板已成功保存至浏览器本地缓存(LocalStorage)中！');
+    alert(`模板「${templateName.value}」已成功保存至浏览器本地缓存(LocalStorage)中！`);
   } catch (e) {
     alert('模板保存失败：' + e.message);
   }
@@ -1925,9 +2034,28 @@ const loadSavedTemplate = () => {
   const saved = localStorage.getItem('report-print-template');
   if (saved) {
     try {
-      elements.value = JSON.parse(saved);
+      const payload = JSON.parse(saved);
+      // 兼容老版本只存了数组的情况
+      if (Array.isArray(payload)) {
+        elements.value = payload;
+      } else {
+        templateId.value = payload.templateId || ('tpl_' + Math.random().toString(36).substr(2, 9));
+        templateName.value = payload.templateName || '未命名打印模板';
+        apiPath.value = payload.apiPath || '/api/v1/business/detail';
+        paperSizePreset.value = payload.paperSizePreset || 'A4';
+        paperWidth.value = payload.paperWidth || 210;
+        paperHeight.value = payload.paperHeight || 297;
+        isLandscape.value = typeof payload.isLandscape === 'boolean' ? payload.isLandscape : false;
+        gridSize.value = payload.gridSize || 5;
+        if (payload.pageMargins) {
+          Object.assign(pageMargins, payload.pageMargins);
+        }
+        elements.value = payload.elements || [];
+      }
       return true;
-    } catch(e) {}
+    } catch(e) {
+      console.error('解析缓存模板失败:', e);
+    }
   }
   return false;
 };
@@ -1945,10 +2073,8 @@ const handleKeyDown = (e) => {
 };
 
 onMounted(() => {
-  // 首次加载：如果有缓存则读取缓存，否则加载默认预设
-  if (!loadSavedTemplate()) {
-    loadDefaultTemplate();
-  }
+  // 首次加载：默认进来直接加载模版库第一个（销售订单报表模板）
+  loadDefaultTemplate();
   window.addEventListener('keydown', handleKeyDown);
 });
 

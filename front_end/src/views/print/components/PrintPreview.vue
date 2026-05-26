@@ -122,8 +122,8 @@
                 v-if="el.type === 'text'" 
                 class="el-text-render"
                 :style="getTextStyle(el)"
+                v-html="interpolate(el.value, page.pageIndex, renderPages.length)"
               >
-                {{ interpolate(el.value, page.pageIndex, renderPages.length) }}
               </div>
               
               <!-- 页码 -->
@@ -232,8 +232,8 @@
               <td 
                 v-if="shouldRenderColumn(tableElement.columns, cIdx)"
                 :colspan="col.colspan || 1"
+                v-html="getRowValue(row, col.field)"
               >
-                {{ getRowValue(row, col.field) }}
               </td>
             </template>
           </tr>
@@ -245,7 +245,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted, nextTick } from 'vue';
-import { mockData, mergeMockData, reportMockData } from '../utils/mockData.js';
+import { mockData, reportMockData, deliveryMockData, assetMockData } from '../utils/mockData.js';
 import { QRCodeAlg } from '../utils/qrcode.js';
 import { BarcodeAlg } from '../utils/barcode.js';
 
