@@ -187,6 +187,7 @@ const props = defineProps({
   skill: { type: String, default: '' },
   flowNodes: { type: Array, default: () => [] },
   fieldPermissions: { type: Object, default: () => ({}) },
+  alwaysEmitCode: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['update:sessionId', 'code-generated'])
@@ -366,7 +367,7 @@ async function executeAgentRequest(userMsg) {
   const lastMsg = messages.value.filter(m => m.role === 'assistant').slice(-1)[0]
   if (lastMsg) {
     const finalCode = lastMsg.blocks.filter(b => b.type === 'text').map(b => b.content).join('')
-    if (finalCode && (finalCode.includes('<template') || finalCode.includes('<script') || finalCode.includes('<style') || finalCode.includes('</template>'))) {
+    if (finalCode && (props.alwaysEmitCode || finalCode.includes('<template') || finalCode.includes('<script') || finalCode.includes('<style') || finalCode.includes('</template>'))) {
       emit('code-generated', finalCode)
     }
   }
@@ -384,7 +385,7 @@ function handleStop() {
   fetch('/adminApi/agent/abort', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ sessionId: props.sessionId }),
+    body: JSON.stringify({ sessionId: props.sessionId || localStorage.getItem(SESSION_KEY) }),
   }).catch(() => {})
 }
 
@@ -833,6 +834,8 @@ function scrollToBottom() {
   padding: 12px;
   border-radius: 8px;
   overflow-x: auto;
+  overflow-y: auto;
+  max-height: 380px;
   font-size: 11px;
   margin: 8px 0;
   border: 1px solid #27272a;

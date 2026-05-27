@@ -1,7 +1,7 @@
 <template>
-  <div class="report-designer-app" :class="{ 'is-preview-mode': isPreview }">
+  <div class="report-designer-app" :class="{ 'is-preview-mode': isPreview }" style="display: flex; flex-direction: column; overflow: hidden; height: 100vh;">
     <!-- 设计模式下的主 UI -->
-    <template v-if="!isPreview">
+    <div v-show="!isPreview" style="display: flex; flex-direction: column; flex: 1; min-height: 0; height: 100%; width: 100%; overflow: hidden;">
       <!-- 顶部功能工具栏 -->
       <header class="designer-header">
         <div class="header-left">
@@ -252,6 +252,13 @@
               @click="activeTab = 'templates'"
             >
               模板库
+            </div>
+            <div 
+              class="tab-item" 
+              :class="{ 'is-active': activeTab === 'ai-generate' }"
+              @click="activeTab = 'ai-generate'"
+            >
+              AI生成
             </div>
           </div>
           
@@ -841,14 +848,42 @@
                 </div>
               </div>
             </div>
+
+            <!-- Tab 4: AI 生成报表 -->
+            <div v-show="activeTab === 'ai-generate'" class="tab-panel ai-generate-panel">
+              <!-- 数据大纲携带开关 -->
+              <div class="ai-data-toggle">
+                <div style="display: flex; flex-direction: column; gap: 1px; min-width: 0;">
+                  <span style="font-size: 11.5px; font-weight: bold; color: #0c1832; display: flex; align-items: center; gap: 4px;">
+                    🔗 联动业务测试接口大纲数据
+                  </span>
+                  <span style="font-size: 9.5px; color: #64748b;" :title="testDebugData ? '已连通您的接口，字段名将自动映射' : '暂无真实接口数据，将以 Mock 示例键名映射'">
+                    {{ testDebugData ? '已就绪：大模型自动解析真实接口键名' : '状态：无真实测试接口，将使用 Mock 示例解析' }}
+                  </span>
+                </div>
+                <label style="margin: 0; user-select: none; display: flex; align-items: center; gap: 4px; cursor: pointer;">
+                  <input type="checkbox" v-model="aiIncludeTestData" style="cursor: pointer;" />
+                  <span style="font-size: 11px; font-weight: bold; color: #d97706; white-space: nowrap;">携带大纲</span>
+                </label>
+              </div>
+              <!-- 复用已有 AiChat 通用组件 -->
+              <AiChat
+                :source-code="aiSourceCode"
+                skill="print-template-gen"
+                :always-emit-code="true"
+                input-placeholder="描述报表需求，例如：'生成 A4 横向采购对账单，带签收盖章' ..."
+                @code-generated="onAiCodeGenerated"
+              />
+            </div>
           </div>
         </aside>
       </main>
-    </template>
+    </div>
 
     <!-- 预览与打印排版接管视图 -->
-    <template v-else>
+    <div v-show="isPreview" style="display: flex; flex-direction: column; flex: 1; min-height: 0; height: 100%; width: 100%; overflow: auto;">
       <PrintPreview 
+        v-if="isPreview"
         :elements="elements"
         :paper-width="paperWidth"
         :paper-height="paperHeight"
@@ -861,7 +896,7 @@
         :test-business-id="testBusinessId"
         @close="exitPreview"
       />
-    </template>
+    </div>
   </div>
 </template>
 
@@ -871,6 +906,7 @@ import { useRoute } from 'vue-router';
 import Ruler from './components/Ruler.vue';
 import DesignCanvas from './components/DesignCanvas.vue';
 import PrintPreview from './components/PrintPreview.vue';
+import AiChat from '@/components/ai/AiChat.vue';
 import { mockData, reportMockData, deliveryMockData, assetMockData } from './utils/mockData.js';
 import { getPrintTemplateDetail, updatePrintTemplate } from '@/api/printTemplate';
 
@@ -933,6 +969,9 @@ const pageMargins = reactive({
 const isPreview = ref(false);
 const activeTab = ref('style');
 
+// AI 智能生成报表
+const aiIncludeTestData = ref(true);
+
 // 🔍 自动聚焦：当有组件被选中激活（activeId 改变且不为空）时，右侧属性面板自动切换至【组件属性】标签页
 watch(activeId, (newId) => {
   if (newId) {
@@ -992,13 +1031,26 @@ const treeNodes = computed(() => {
           label: `[列表数据源] - 共有 ${obj.length} 条记录`,
           isList: true
         });
+        
+        // 递归列表子字段以打平展示多级嵌套属性，杜绝 [object Object]
+        function recurseListField(key, val, prefix = '') {
+          const fullField = prefix ? `${prefix}.${key}` : key;
+          if (val && typeof val === 'object' && !Array.isArray(val)) {
+            for (const [subK, subV] of Object.entries(val)) {
+              recurseListField(subK, subV, fullField);
+            }
+          } else {
+            nodes.push({
+              path: fullField, // 明细列只需写字段名相对路径，例如 template.templateName
+              label: `┗━━ [列属性] ${fullField} 示例值: ${val}`,
+              isSub: true
+            });
+          }
+        }
+
         // 遍历数组下子字段
         for (const [key, val] of Object.entries(firstItem)) {
-          nodes.push({
-            path: key, // 明细列只需写字段名相对路径，例如 goodsName
-            label: `┗━━ [列属性] 示例值: ${val}`,
-            isSub: true
-          });
+          recurseListField(key, val);
         }
       }
       return;
@@ -1577,6 +1629,572 @@ const enterPreview = async () => {
 
 const exitPreview = () => {
   isPreview.value = false;
+};
+
+// ==========================================
+// AI 智能生成：复用 AiChat 通用组件对接大模型
+// ==========================================
+const aiSourceCode = computed(() => {
+  const schema = (aiIncludeTestData.value && testDebugData.value) ? testDebugData.value : activeMockData.value;
+  return JSON.stringify({
+    instruction: '请在回答中直接生成符合约束的打印报表 elements 数组 JSON（用 ```json 包裹）。主表字段用 ${master.xxx} 插值，明细表格列 columns 的 field 用 detail.xxx 格式，页码 type 为 page-number。XY/宽高为逻辑像素（1mm ≈ 3.78px），元素不要堆叠。',
+    currentElements: elements.value,
+    dataSchema: schema,
+    paperConfig: {
+      preset: paperSizePreset.value,
+      width: paperWidth.value,
+      height: paperHeight.value,
+      isLandscape: isLandscape.value
+    }
+  }, null, 2);
+});
+
+const onAiCodeGenerated = (code) => {
+  if (!code) return;
+  const applied = extractAndApplyElementsJson(code);
+  if (applied) {
+    window.$message?.success('🎉 AI 已自动生成并更新画布设计！');
+  }
+};
+
+// 剥离大模型各种 markdown json 包装并热更新的容错提取引擎
+const extractAndApplyElementsJson = (text) => {
+  if (!text) return false;
+  
+  let jsonStr = '';
+  // 1. 优先提取 ```json ... ``` 包裹的块
+  const jsonBlockMatch = text.match(/```json\s+([\s\S]*?)```/);
+  if (jsonBlockMatch && jsonBlockMatch[1]) {
+    jsonStr = jsonBlockMatch[1].trim();
+  } else {
+    // 2. 其次提取 ``` ... ``` 之间的块
+    const blockMatch = text.match(/```\s+([\s\S]*?)```/);
+    if (blockMatch && blockMatch[1]) {
+      jsonStr = blockMatch[1].trim();
+    } else {
+      // 3. 寻找首个 [ 到最后一个 ]
+      const firstBracket = text.indexOf('[');
+      const lastBracket = text.lastIndexOf(']');
+      if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) {
+        jsonStr = text.substring(firstBracket, lastBracket + 1);
+      } else {
+        // 4. 寻找首个 { 到最后一个 }
+        const firstCurly = text.indexOf('{');
+        const lastCurly = text.lastIndexOf('}');
+        if (firstCurly !== -1 && lastCurly !== -1 && lastCurly > firstCurly) {
+          jsonStr = text.substring(firstCurly, lastCurly + 1);
+        }
+      }
+    }
+  }
+
+  if (!jsonStr) return false;
+
+  try {
+    // 过滤掉可能残余的 markdown 符号
+    const cleanedJson = jsonStr.replace(/^[^{[]*/, '').replace(/[^}\]]*$/, '').trim();
+    const parsed = JSON.parse(cleanedJson);
+    
+    let finalElements = null;
+    let paperPreset = '';
+    let isLand = false;
+    let wMm = 0;
+    let hMm = 0;
+
+    // 👈 革命性升级：检测是否为大模型单体输出的局部修改元素 (如只输出了一个修改后的 table 对象)
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && !Array.isArray(parsed.elements) && parsed.type) {
+      const targetId = parsed.id || elements.value.find(el => el.type === parsed.type)?.id;
+      if (targetId) {
+        elements.value = elements.value.map(el => {
+          if (el.id === targetId) {
+            // 合并原有属性，防止丢失如 x, y, width, height 等关键定位信息
+            const merged = { ...el, ...parsed };
+            // 对 text / qrcode / barcode 的值进行容错
+            if (merged.type === 'text') {
+              merged.value = merged.value !== undefined ? merged.value : (merged.text !== undefined ? merged.text : (merged.label !== undefined ? merged.label : el.value));
+            } else if (merged.type === 'qrcode' || merged.type === 'barcode') {
+              merged.value = merged.value !== undefined ? merged.value : (merged.text !== undefined ? merged.text : (merged.label !== undefined ? merged.label : el.value));
+            }
+            return merged;
+          }
+          return el;
+        });
+        activeId.value = targetId; // 选中当前修改的组件
+        return true;
+      }
+    }
+
+    if (Array.isArray(parsed)) {
+      finalElements = parsed;
+    } else if (parsed && typeof parsed === 'object') {
+      if (Array.isArray(parsed.elements)) {
+        finalElements = parsed.elements;
+      }
+      if (parsed.paperSizePreset) paperPreset = parsed.paperSizePreset;
+      if (parsed.isLandscape !== undefined) isLand = parsed.isLandscape;
+      if (parsed.paperWidth) wMm = parsed.paperWidth;
+      if (parsed.paperHeight) hMm = parsed.paperHeight;
+    }
+
+    if (finalElements && finalElements.length > 0) {
+      finalElements = finalElements.map((el, idx) => {
+        if (!el.id) el.id = `ai_gen_${el.type}_${Date.now()}_${idx}`;
+        if (el.x === undefined) el.x = 40;
+        if (el.y === undefined) el.y = 40;
+        
+        // 鲁棒容错补全：防止大模型写错属性名导致页面文字为空
+        if (el.type === 'text') {
+          el.value = el.value !== undefined ? el.value : (el.text !== undefined ? el.text : (el.label !== undefined ? el.label : '新文本组件'));
+        } else if (el.type === 'qrcode' || el.type === 'barcode') {
+          el.value = el.value !== undefined ? el.value : (el.text !== undefined ? el.text : (el.label !== undefined ? el.label : '1234567890'));
+        }
+        return el;
+      });
+
+      if (paperPreset) {
+        paperSizePreset.value = paperPreset;
+      }
+      if (isLand !== undefined) {
+        isLandscape.value = isLand;
+      }
+      if (wMm && hMm) {
+        paperWidth.value = wMm;
+        paperHeight.value = hMm;
+      }
+
+      elements.value = finalElements;
+      activeId.value = '';
+      return true;
+    }
+  } catch (e) {
+    console.warn('[Fallback JSON Extracting Exception]', e);
+  }
+  return false;
+};
+
+// 🌟 强意图感知与接口数据大纲深度融合的智能反射生成器 (降级/快捷卡片专用)
+const handleAIGenerateReport = (prompt) => {
+  let paperPreset = 'A4';
+  let wMm = 210;
+  let hMm = 297;
+  let landscape = false;
+
+  const lowPrompt = prompt.toLowerCase();
+  
+  if (lowPrompt.includes('a5')) {
+    paperPreset = 'A5';
+    wMm = 148;
+    hMm = 210;
+  } else if (lowPrompt.includes('a3')) {
+    paperPreset = 'A3';
+    wMm = 297;
+    hMm = 420;
+  }
+
+  if (lowPrompt.includes('横') || lowPrompt.includes('横向') || lowPrompt.includes('landscape')) {
+    landscape = true;
+    const temp = wMm;
+    wMm = hMm;
+    hMm = temp;
+  }
+
+  paperSizePreset.value = paperPreset;
+  isLandscape.value = landscape;
+  paperWidth.value = wMm;
+  paperHeight.value = hMm;
+
+  const schemaSource = (aiIncludeTestData.value && testDebugData.value) ? testDebugData.value : activeMockData.value;
+  
+  let listKey = '';
+  const masterKeys = [];
+  let firstArrayVal = null;
+
+  if (schemaSource && typeof schemaSource === 'object') {
+    for (const [key, val] of Object.entries(schemaSource)) {
+      if (Array.isArray(val)) {
+        if (!listKey) {
+          listKey = key;
+          if (val.length > 0) {
+            firstArrayVal = val[0];
+          }
+        }
+      } else if (val && typeof val === 'object') {
+        for (const [subK, subV] of Object.entries(val)) {
+          if (!Array.isArray(subV) && typeof subV !== 'object') {
+            masterKeys.push(`${key}.${subK}`);
+          }
+        }
+      } else {
+        masterKeys.push(key);
+      }
+    }
+  }
+
+  if (!listKey) {
+    listKey = 'detail';
+  }
+
+  const newElements = [];
+  
+  let reportTitle = '智能销售送货单';
+  if (prompt.includes('卡') || prompt.includes('标签') || paperPreset === 'A5') {
+    reportTitle = '固定资产设备卡片';
+  } else if (prompt.includes('对账') || prompt.includes('账单')) {
+    reportTitle = '往来采购对账单';
+  } else if (prompt.includes('收条') || prompt.includes('收据')) {
+    reportTitle = '商品点收凭证卡';
+  }
+
+  const titleMatch = prompt.match(/标题(?:为|是|：|:)?[\"']?([^\"'，。！!]+)[\"']?/);
+  if (titleMatch && titleMatch[1]) {
+    reportTitle = titleMatch[1];
+  }
+
+  const toPxVal = (mm) => mm * MM_TO_PX;
+
+  newElements.push({
+    id: 'ai_el_title',
+    type: 'text',
+    x: toPxVal(10),
+    y: toPxVal(10),
+    width: toPxVal(wMm - 20),
+    height: toPxVal(12),
+    value: reportTitle,
+    fontSize: 20,
+    fontColor: '#0f172a',
+    align: 'center',
+    valign: 'middle',
+    fontWeight: 'bold',
+    showStrategy: 'all'
+  });
+
+  let hasBarcode = lowPrompt.includes('条形码') || lowPrompt.includes('条码');
+  let hasQrcode = lowPrompt.includes('二维码') || lowPrompt.includes('扫码') || lowPrompt.includes('标签') || paperPreset === 'A5';
+
+  if (!hasBarcode && !hasQrcode) {
+    if (paperPreset === 'A5') {
+      hasQrcode = true;
+    } else {
+      hasBarcode = true;
+    }
+  }
+
+  let codeBindField = 'orderNo';
+  const foundCodeField = masterKeys.find(k => k.toLowerCase().includes('no') || k.toLowerCase().includes('code') || k.toLowerCase().includes('num') || k.toLowerCase().includes('id'));
+  if (foundCodeField) {
+    codeBindField = foundCodeField;
+  }
+
+  if (hasBarcode) {
+    newElements.push({
+      id: 'ai_el_barcode',
+      type: 'barcode',
+      x: toPxVal(wMm - 60),
+      y: toPxVal(10),
+      width: toPxVal(50),
+      height: toPxVal(15),
+      value: `\${master.${codeBindField}}`,
+      showText: true,
+      showStrategy: 'all'
+    });
+  } else if (hasQrcode) {
+    newElements.push({
+      id: 'ai_el_qrcode',
+      type: 'qrcode',
+      x: toPxVal(wMm - 32),
+      y: toPxVal(10),
+      width: toPxVal(22),
+      height: toPxVal(22),
+      value: `\${master.${codeBindField}}`,
+      showStrategy: 'all'
+    });
+  }
+
+  const chosenMasterKeys = [];
+  const importantMasterKeywords = ['customer', 'date', 'phone', 'address', 'supplier', 'user', 'name', 'dept', 'amount', 'no'];
+  
+  masterKeys.forEach(k => {
+    const lk = k.toLowerCase();
+    if (importantMasterKeywords.some(kw => lk.includes(kw)) && !chosenMasterKeys.includes(k)) {
+      chosenMasterKeys.push(k);
+    }
+  });
+
+  if (chosenMasterKeys.length < 4) {
+    masterKeys.forEach(k => {
+      if (!chosenMasterKeys.includes(k) && chosenMasterKeys.length < 4) {
+        chosenMasterKeys.push(k);
+      }
+    });
+  }
+
+  if (chosenMasterKeys.length === 0) {
+    chosenMasterKeys.push('orderNo', 'deliveryDate', 'customerName', 'contactPhone');
+  }
+
+  const translateMap = {
+    'orderno': '单据单号', 'billno': '业务单号', 'code': '设备代码', 'id': '主键 ID',
+    'customername': '客户名称', 'customer': '往来客户', 'suppliername': '供应商名', 'supplier': '供应商',
+    'deliverydate': '送货日期', 'date': '业务日期', 'createtime': '创建时间',
+    'contactphone': '联系电话', 'phone': '电话号码', 'tel': '联系手机',
+    'address': '送货地址', 'deptname': '使用部门', 'dept': '所属部门',
+    'user': '责任人员', 'author': '制作人', 'year': '述职年度',
+    'keeper': '管理员', 'store': '存放仓库'
+  };
+
+  const translateField = (f) => {
+    const lf = f.split('.').pop().toLowerCase();
+    return translateMap[lf] || f.split('.').pop();
+  };
+
+  let masterY = 28;
+  
+  for (let i = 0; i < chosenMasterKeys.length; i += 2) {
+    const col1Field = chosenMasterKeys[i];
+    const col2Field = chosenMasterKeys[i + 1];
+
+    if (col1Field) {
+      newElements.push({
+        id: `ai_el_master_${i}`,
+        type: 'text',
+        x: toPxVal(10),
+        y: toPxVal(masterY),
+        width: toPxVal((wMm - 20) / 2 - 5),
+        height: toPxVal(8),
+        value: `${translateField(col1Field)}: \${master.${col1Field}}`,
+        fontSize: 12,
+        fontColor: '#475569',
+        align: 'left',
+        valign: 'middle',
+        fontWeight: 'normal',
+        showStrategy: 'first'
+      });
+    }
+
+    if (col2Field) {
+      newElements.push({
+        id: `ai_el_master_${i + 1}`,
+        type: 'text',
+        x: toPxVal(10 + (wMm - 20) / 2 + 5),
+        y: toPxVal(masterY),
+        width: toPxVal((wMm - 20) / 2 - 5),
+        height: toPxVal(8),
+        value: `${translateField(col2Field)}: \${master.${col2Field}}`,
+        fontSize: 12,
+        fontColor: '#475569',
+        align: 'left',
+        valign: 'middle',
+        fontWeight: 'normal',
+        showStrategy: 'first'
+      });
+    }
+
+    masterY += 9;
+  }
+
+  newElements.push({
+    id: 'ai_el_divider',
+    type: 'line-h',
+    x: toPxVal(10),
+    y: toPxVal(masterY + 1),
+    width: toPxVal(wMm - 20),
+    height: toPxVal(3),
+    borderWidth: 1,
+    borderStyle: 'solid',
+    fontColor: '#cbd5e1',
+    showStrategy: 'all'
+  });
+
+  let tableStartY = masterY + 5;
+
+  let hasTable = !lowPrompt.includes('不需要表格') && !lowPrompt.includes('没有表格') && paperPreset !== 'A5';
+  
+  if (hasTable) {
+    const tableColumns = [];
+    
+    if (firstArrayVal && typeof firstArrayVal === 'object') {
+      const arrayKeys = Object.keys(firstArrayVal);
+      const importantSubKeywords = ['index', 'name', 'goods', 'item', 'quantity', 'qty', 'price', 'amount', 'total', 'remark', 'code', 'spec'];
+      const chosenSubKeys = [];
+
+      arrayKeys.forEach(sk => {
+        const lsk = sk.toLowerCase();
+        if (importantSubKeywords.some(kw => lsk.includes(kw)) && !chosenSubKeys.includes(sk)) {
+          chosenSubKeys.push(sk);
+        }
+      });
+
+      if (chosenSubKeys.length < 4) {
+        arrayKeys.forEach(sk => {
+          if (!chosenSubKeys.includes(sk) && chosenSubKeys.length < 4) {
+            chosenSubKeys.push(sk);
+          }
+        });
+      }
+
+      const colWidthBase = Math.floor((wMm - 20) * MM_TO_PX);
+      const partCount = chosenSubKeys.length;
+      
+      chosenSubKeys.forEach((subKey, subIdx) => {
+        let title = subKey;
+        const lsk = subKey.toLowerCase();
+        if (lsk.includes('index') || lsk.includes('seq')) title = '序号';
+        else if (lsk.includes('goodsname') || lsk.includes('name')) title = '商品名称';
+        else if (lsk.includes('goodscode') || lsk.includes('code')) title = '商品编码';
+        else if (lsk.includes('quantity') || lsk.includes('qty')) title = '数量';
+        else if (lsk.includes('price')) title = '单价';
+        else if (lsk.includes('amount') || lsk.includes('total')) title = '小计金额';
+        else if (lsk.includes('remark')) title = '备注';
+        else if (lsk.includes('spec')) title = '规格规格';
+
+        let wPx = Math.floor(colWidthBase / partCount);
+        if (title === '序号') wPx = 50;
+        else if (title === '商品名称') wPx = 280;
+        
+        let colAlign = 'left';
+        if (['序号', '规格', '商品编码'].includes(title)) colAlign = 'center';
+        if (['数量', '单价', '小计金额'].includes(title)) colAlign = 'right';
+
+        tableColumns.push({
+          title: title,
+          field: `detail.${subKey}`,
+          width: wPx,
+          align: colAlign
+        });
+      });
+
+      let sumW = tableColumns.reduce((s, c) => s + c.width, 0);
+      let diff = colWidthBase - sumW;
+      if (tableColumns.length > 0 && Math.abs(diff) < 150) {
+        tableColumns[tableColumns.length - 1].width += diff;
+      }
+
+    } else {
+      tableColumns.push(
+        { title: '序号', field: 'detail.index', width: 50, align: 'center' },
+        { title: '商品物料名称', field: 'detail.goodsName', width: 280, align: 'left' },
+        { title: '数量', field: 'detail.quantity', width: 80, align: 'right' },
+        { title: '物理单价', field: 'detail.price', width: 100, align: 'right' },
+        { title: '金额小计', field: 'detail.amount', width: 100, align: 'right' },
+        { title: '出库备注说明', field: 'detail.remarks', width: 108, align: 'left' }
+      );
+
+      if (landscape) {
+        tableColumns[1].width = 450;
+        tableColumns[5].width = 238;
+      }
+    }
+
+    const tableHeightMm = hMm - tableStartY - 30;
+
+    const tableElement = {
+      id: 'ai_el_table',
+      type: 'table',
+      x: toPxVal(10),
+      y: toPxVal(tableStartY),
+      width: toPxVal(wMm - 20),
+      height: toPxVal(tableHeightMm),
+      repeatHeader: true,
+      dataSourcePath: listKey,
+      columns: tableColumns,
+      showStrategy: 'all'
+    };
+
+    if (lowPrompt.includes('复杂') || lowPrompt.includes('合并表头') || lowPrompt.includes('双行')) {
+      tableElement.headerRows = [
+        [
+          { title: '明细数据排版合并总表', rowspan: 1, colspan: tableColumns.length, align: 'center', backgroundColor: '#f8fafc', fontWeight: 'bold' }
+        ],
+        tableColumns.map(col => ({
+          title: col.title,
+          rowspan: 1,
+          colspan: 1,
+          align: 'center',
+          backgroundColor: '#eff6ff',
+          fontWeight: 'bold'
+        }))
+      ];
+    }
+
+    newElements.push(tableElement);
+    tableStartY += tableHeightMm;
+  } else {
+    newElements.push(
+      {
+        id: 'ai_el_asset_rect',
+        type: 'rect',
+        x: toPxVal(10),
+        y: toPxVal(tableStartY + 2),
+        width: toPxVal(wMm - 20),
+        height: toPxVal(hMm - tableStartY - 25),
+        borderWidth: 1.5,
+        borderStyle: 'solid',
+        fontColor: '#94a3b8',
+        backgroundColor: 'transparent',
+        showStrategy: 'all'
+      },
+      {
+        id: 'ai_el_asset_tips',
+        type: 'text',
+        x: toPxVal(15),
+        y: toPxVal(tableStartY + 10),
+        width: toPxVal(wMm - 30),
+        height: toPxVal(15),
+        value: '设备资产使用须知：\n1. 请妥善保管本标签卡并贴于固定设备显著表面；\n2. 责任保管人员发生变更时需重新扫码报备登记。',
+        fontSize: 11,
+        fontColor: '#64748b',
+        align: 'left',
+        valign: 'middle',
+        fontWeight: 'normal',
+        showStrategy: 'all'
+      }
+    );
+    tableStartY = hMm - 20;
+  }
+
+  let hasStamp = lowPrompt.includes('签字') || lowPrompt.includes('签收') || lowPrompt.includes('盖章') || lowPrompt.includes('合计') || !hasTable;
+  if (hasStamp) {
+    newElements.push({
+      id: 'ai_el_stamp',
+      type: 'text',
+      x: toPxVal(10),
+      y: toPxVal(hMm - 24),
+      width: toPxVal(wMm - 20),
+      height: toPxVal(10),
+      value: `财务合计审核：__________________       出库人签字：__________________       客户签收盖章：__________________`,
+      fontSize: 11,
+      fontColor: '#1e293b',
+      align: 'left',
+      valign: 'middle',
+      fontWeight: 'bold',
+      showStrategy: 'last'
+    });
+  }
+
+  newElements.push({
+    id: 'ai_el_pagenum',
+    type: 'page-number',
+    x: toPxVal(wMm / 2 - 20),
+    y: toPxVal(hMm - 11),
+    width: toPxVal(40),
+    height: toPxVal(8),
+    fontSize: 11,
+    fontColor: '#64748b',
+    align: 'center',
+    valign: 'middle',
+    showStrategy: 'all'
+  });
+
+  elements.value = newElements;
+  activeId.value = '';
+
+  return {
+    paperSize: paperPreset,
+    widthMm: wMm,
+    heightMm: hMm,
+    isLandscape: landscape,
+    elementCount: newElements.length
+  };
 };
 
 // 加载图 3 年度述职报告复杂表模板
@@ -2350,6 +2968,7 @@ const clearTestData = () => {
 onMounted(async () => {
   window.addEventListener('keydown', handleKeyDown);
   
+
   // 智能挂载：如果有 query.id 则从 Nest 动态获取，否则加载默认示例
   const loaded = await loadSavedTemplate();
   if (!loaded) {
@@ -2960,11 +3579,17 @@ onBeforeUnmount(() => {
 
 .right-panel-body {
   flex: 1;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .tab-panel {
   padding: 16px;
+  height: 100%;
+  overflow-y: auto;
+  box-sizing: border-box;
 }
 
 .panel-placeholder {
@@ -3333,5 +3958,33 @@ onBeforeUnmount(() => {
   background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
   box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
   transform: translateY(-0.5px);
+}
+
+/* AI 生成面板 */
+.ai-generate-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding: 12px;
+  box-sizing: border-box;
+}
+.ai-generate-panel .ai-data-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 8px 10px;
+  box-sizing: border-box;
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+.ai-generate-panel .ai-chat {
+  flex: 1;
+  min-height: 0;
 }
 </style>
