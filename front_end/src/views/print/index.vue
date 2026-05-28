@@ -1,5 +1,5 @@
 <template>
-  <div class="report-designer-app" :class="{ 'is-preview-mode': isPreview }" style="display: flex; flex-direction: column; overflow: hidden; height: 100vh;">
+  <div class="report-designer-app" :class="{ 'is-preview-mode': isPreview }" style="display: flex; flex-direction: column; overflow: hidden; height: 100%;">
     <!-- 设计模式下的主 UI -->
     <div v-show="!isPreview" style="display: flex; flex-direction: column; flex: 1; min-height: 0; height: 100%; width: 100%; overflow: hidden;">
       <!-- 顶部功能工具栏 -->
@@ -2972,6 +2972,12 @@ const clearTestData = () => {
 onMounted(async () => {
   window.addEventListener('keydown', handleKeyDown);
   
+  // 智能给 Layout 容器加上全屏铺满专属类，实现免 padding 及溢出裁剪
+  const layout = document.querySelector('.app-layout');
+  if (layout) {
+    layout.classList.add('layout-content-fullpage');
+  }
+  
 
   // 智能挂载：如果有 query.id 则从 Nest 动态获取，否则加载默认示例
   const loaded = await loadSavedTemplate();
@@ -2982,10 +2988,29 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', handleKeyDown);
+  
+  // 离开设计器时移除全屏铺满类，完美还原其他页面的原本布局
+  const layout = document.querySelector('.app-layout');
+  if (layout) {
+    layout.classList.remove('layout-content-fullpage');
+  }
 });
 </script>
 
 <style>
+/* 当设计器载入时，重写后台内容容器样式以实现 100% 极致无缝铺满 */
+.layout-content-fullpage .content-area {
+  padding: 0 !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+.layout-content-fullpage .content-inner {
+  flex: 1 !important;
+  min-height: 0 !important;
+  height: 100% !important;
+}
+
 /* 全局页面美化，应用富视觉设计 */
 .report-designer-app {
   display: flex;

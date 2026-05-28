@@ -1,32 +1,42 @@
-import { 
-  Controller, 
-  Post, 
-  Get, 
-  Body, 
-  Query, 
-  Res, 
+import {
+  Controller,
+  Post,
+  Get,
+  Body,
+  Query,
+  Res,
   Req,
   HttpException,
   HttpStatus,
   ValidationPipe,
   UseFilters,
-  UseInterceptors
+  UseInterceptors,
+  UploadedFile,
+  UseGuards
 } from '@nestjs/common';
 import { Response, Request } from 'express';
-import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiQuery } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiQuery, ApiConsumes } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import * as path from 'path';
 
 import { AiService } from './ai.service';
 import { AiLoggerService } from './utils/logger.service';
-import { 
-  StreamChatDto, 
-  CompletionChatDto, 
-  GetModelsDto, 
+import {
+  StreamChatDto,
+  CompletionChatDto,
+  GetModelsDto,
   BaseResponseDto,
   GetModelsResponseDto,
   CozeWorkflowRunDto,
   CozeWorkflowStreamRunDto,
   CozeWorkflowResponseDto
 } from './dto/chat.dto';
+import {
+  VoiceCloneDto,
+  TextToSpeechDto,
+  VoiceCloneResponseDto
+} from './dto/voice.dto';
 
 @ApiTags('AI聊天')
 @Controller('ai')
@@ -506,13 +516,185 @@ export class AiController {
 
     } catch (error: any) {
       this.logger.error('Coze 工作流流式运行控制器错误', error);
-      
+
       if (!res.headersSent) {
         res.status(error.status || 500).json({
           error: '服务器错误',
           message: error.message || '未知错误'
         });
       }
+    }
+  }
+
+  @Post('voice/upload')
+  @ApiOperation({
+    summary: '上传音频文件',
+    description: '上传音频文件到 MiniMax 平台，用于后续的音色克隆'
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+          description: '音频文件（mp3/m4a/wav，最大20MB，10秒-5分钟）'
+        },
+        purpose: {
+          type: 'string',
+          enum: ['voice_clone', 'prompt_audio'],
+          default: 'voice_clone',
+          description: '用途：voice_clone（待克隆音频）或 prompt_audio（示例音频）'
+        }
+      }
+    }
+  })
+  @ApiResponse({
+    status: 200,
+    description: '上传成功',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        fileId: { type: 'string' }
+      }
+    }
+  })
+  @UseInterceptors(FileInterceptor('file', {
+    limits: { fileSize: 20 * 1024 * 1024 }, // 20MB
+    fileFilter: (req, file, cb) => {
+      const allowedMimes = ['audio/mpeg', 'audio/mp3', 'audio/m4a', 'audio/wav', 'audio/x-wav'];
+      if (allowedMimes.includes(file.mimetype)) {
+        cb(null, true);
+      } else {
+        cb(new HttpException('仅支持 mp3、m4a、wav 格式的音频文件', HttpStatus.BAD_REQUEST), false);
+      }
+    }
+  }))
+  async uploadAudio(
+    @UploadedFile() file: Express.Multer.File,
+    @Body('purpose') purpose: string = 'voice_clone'
+  ) {
+    try {
+      if (!file) {
+        throw new HttpException('请上传音频文件', HttpStatus.BAD_REQUEST);
+      }
+
+      const fileId = await this.aiService.uploadAudioFile(file, purpose);
+
+      return {
+        success: true,
+        fileId
+      };
+
+    } catch (error: any) {
+      this.logger.error('音频上传控制器错误', error);
+      throw new HttpException({
+        error: '上传失败',
+        message: error.message || '未知错误'
+      }, error.status || HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  @Post('voice/clone')
+  @ApiOperation({
+    summary: '音色克隆',
+    description: '使用上传的音频文件克隆音色，并生成试听音频'
+  })
+  @ApiBody({
+    type: VoiceCloneDto,
+    description: '音色克隆请求参数'
+  })
+  @ApiResponse({
+    status: 200,
+    description: '克隆成功',
+    type: VoiceCloneResponseDto
+  })
+  @ApiResponse({
+    status: 400,
+    description: '参数错误',
+    type: BaseResponseDto
+  })
+  async cloneVoice(
+    @Body(ValidationPipe) voiceCloneDto: VoiceCloneDto
+  ) {
+    try {
+      const result = await this.aiService.cloneVoice(
+        voiceCloneDto.fileId as any,
+        voiceCloneDto.voiceId,
+        voiceCloneDto.text,
+        {
+          promptFileId: voiceCloneDto.promptFileId,
+          promptText: voiceCloneDto.promptText,
+          model: voiceCloneDto.model
+        }
+      );
+
+      return {
+        success: true,
+        voiceId: voiceCloneDto.voiceId,
+        audioUrl: result.audioUrl,
+        audioBase64: result.audioBase64
+      };
+
+    } catch (error: any) {
+      this.logger.error('音色克隆控制器错误', error);
+      throw new HttpException({
+        error: '克隆失败',
+        message: error.message || '未知错误'
+      }, error.status || HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  @Post('voice/tts')
+  @ApiOperation({
+    summary: '文字转语音',
+    description: '使用指定音色将文字转换为语音'
+  })
+  @ApiBody({
+    type: TextToSpeechDto,
+    description: '文字转语音请求参数'
+  })
+  @ApiResponse({
+    status: 200,
+    description: '合成成功',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        audioUrl: { type: 'string' },
+        audioBase64: { type: 'string' }
+      }
+    }
+  })
+  async textToSpeech(
+    @Body(ValidationPipe) textToSpeechDto: TextToSpeechDto
+  ) {
+    try {
+      const result = await this.aiService.textToSpeech(
+        textToSpeechDto.text,
+        textToSpeechDto.voiceId,
+        {
+          model: textToSpeechDto.model,
+          speed: textToSpeechDto.speed,
+          volume: textToSpeechDto.volume,
+          sampleRate: textToSpeechDto.sampleRate
+        }
+      );
+
+      return {
+        success: true,
+        audioUrl: result.audioUrl,
+        audioBase64: result.audioBase64
+      };
+
+    } catch (error: any) {
+      this.logger.error('文字转语音控制器错误', error);
+      throw new HttpException({
+        error: '语音合成失败',
+        message: error.message || '未知错误'
+      }, error.status || HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 }

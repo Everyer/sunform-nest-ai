@@ -752,4 +752,250 @@ export class AiService {
       throw error;
     }
   }
+
+  /**
+   * 音色克隆 - 使用 MiniMax API 克隆音色
+   */
+  async cloneVoice(fileId: number, voiceId: string, text: string, options?: {
+    promptFileId?: string;
+    promptText?: string;
+    model?: string;
+  }): Promise<{ audioUrl: string; audioBase64: string }> {
+    const apiKey = this.configService.get<string>('MINIMAX_API_KEY');
+    if (!apiKey) {
+      throw new Error('MINIMAX_API_KEY 未配置');
+    }
+
+    const baseUrl = 'https://api.minimaxi.com/v1';
+
+    // 构建克隆请求参数
+    const requestData: any = {
+      file_id: fileId,
+      voice_id: voiceId,
+      text,
+      model: options?.model || 'speech-2.8-hd'
+    };
+
+    // 如果提供了示例音频，添加到请求中
+    if (options?.promptFileId && options?.promptText) {
+      requestData.clone_prompt = {
+        prompt_audio: options.promptFileId,
+        prompt_text: options.promptText
+      };
+    }
+
+    this.logger.info('开始音色克隆', { fileId, voiceId, text: text.substring(0, 50) });
+
+    try {
+      const response = await axios({
+        method: 'POST',
+        url: `${baseUrl}/voice_clone`,
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        data: requestData
+      });
+
+      const audioData = response.data;
+
+      // MiniMax 返回的是 base64 编码的音频数据或 URL
+      console.log('MiniMax clone response:', JSON.stringify(audioData, null, 2).substring(0, 500));
+
+      // 尝试多种可能的响应格式
+      // 格式1: demo_audio (URL)
+      if (audioData.demo_audio) {
+        return {
+          audioUrl: audioData.demo_audio,
+          audioBase64: ''
+        };
+      }
+
+      // 格式2: data.audio (base64/hex)
+      if (audioData.data?.audio) {
+        const audioStr = audioData.data.audio;
+        const audioBuffer = /^[0-9a-fA-F]+$/.test(audioStr) && audioStr.length % 2 === 0
+          ? Buffer.from(audioStr, 'hex')
+          : Buffer.from(audioStr, 'base64');
+        const audioBase64 = audioBuffer.toString('base64');
+        return {
+          audioUrl: `data:audio/mp3;base64,${audioBase64}`,
+          audioBase64
+        };
+      }
+
+      // 格式3: audio (base64/hex)
+      if (audioData.audio) {
+        const audioStr = audioData.audio;
+        const audioBuffer = /^[0-9a-fA-F]+$/.test(audioStr) && audioStr.length % 2 === 0
+          ? Buffer.from(audioStr, 'hex')
+          : Buffer.from(audioStr, 'base64');
+        const audioBase64 = audioBuffer.toString('base64');
+        return {
+          audioUrl: `data:audio/mp3;base64,${audioBase64}`,
+          audioBase64
+        };
+      }
+
+      // 格式4: base_resp 有错误
+      if (audioData.base_resp?.status_code && audioData.base_resp.status_code !== 0) {
+        throw new Error(audioData.base_resp.status_msg || '音色克隆失败');
+      }
+
+      throw new Error('克隆响应中未找到音频数据');
+
+    } catch (error: any) {
+      this.logger.error('音色克隆错误', error.response?.data || error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * 文字转语音 - 使用 MiniMax T2A 接口
+   */
+  async textToSpeech(text: string, voiceId: string, options?: {
+    model?: string;
+    speed?: number;
+    volume?: number;
+    sampleRate?: number;
+  }): Promise<{ audioUrl: string; audioBase64: string }> {
+    const apiKey = this.configService.get<string>('MINIMAX_API_KEY');
+    if (!apiKey) {
+      throw new Error('MINIMAX_API_KEY 未配置');
+    }
+
+    const baseUrl = 'https://api.minimaxi.com/v1';
+
+    // 构建 T2A 请求参数（MiniMax T2A V2 格式）
+    const requestData: any = {
+      model: options?.model || 'speech-2.8-hd',
+      text,
+      voice_setting: {
+        voice_id: voiceId,
+        speed: options?.speed || 1.0,
+        vol: options?.volume || 1.0,
+        pitch: 0
+      }
+    };
+
+    this.logger.info('文字转语音', { text: text.substring(0, 50), voiceId });
+
+    try {
+      const response = await axios({
+        method: 'POST',
+        url: `${baseUrl}/t2a_v2`,
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        data: requestData
+      });
+
+      const audioData = response.data;
+
+      // 添加日志查看 TTS 响应格式
+      console.log('MiniMax TTS request:', JSON.stringify(requestData, null, 2));
+      console.log('MiniMax TTS response:', JSON.stringify(audioData, null, 2).substring(0, 1000));
+
+      // MiniMax 返回的是 hex 编码或 base64 编码的音频数据或 URL
+      // 格式1: data.audio (base64/hex)
+      if (audioData.data?.audio) {
+        const audioStr = audioData.data.audio;
+        const audioBuffer = /^[0-9a-fA-F]+$/.test(audioStr) && audioStr.length % 2 === 0
+          ? Buffer.from(audioStr, 'hex')
+          : Buffer.from(audioStr, 'base64');
+        const audioBase64 = audioBuffer.toString('base64');
+        return {
+          audioUrl: `data:audio/mpeg;base64,${audioBase64}`,
+          audioBase64
+        };
+      }
+
+      // 格式2: audio (base64/hex)
+      if (audioData.audio) {
+        const audioStr = audioData.audio;
+        const audioBuffer = /^[0-9a-fA-F]+$/.test(audioStr) && audioStr.length % 2 === 0
+          ? Buffer.from(audioStr, 'hex')
+          : Buffer.from(audioStr, 'base64');
+        const audioBase64 = audioBuffer.toString('base64');
+        return {
+          audioUrl: `data:audio/mpeg;base64,${audioBase64}`,
+          audioBase64
+        };
+      }
+
+      // 格式3: base_resp 有错误
+      if (audioData.base_resp?.status_code && audioData.base_resp.status_code !== 0) {
+        throw new Error(audioData.base_resp.status_msg || '语音合成失败');
+      }
+
+      throw new Error('语音合成响应中未找到音频数据');
+
+    } catch (error: any) {
+      this.logger.error('文字转语音错误', error.response?.data || error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * 上传音频文件到 MiniMax
+   */
+  async uploadAudioFile(file: Express.Multer.File, purpose: string = 'voice_clone'): Promise<string> {
+    const apiKey = this.configService.get<string>('MINIMAX_API_KEY');
+    if (!apiKey) {
+      throw new Error('MINIMAX_API_KEY 未配置');
+    }
+
+    const baseUrl = 'https://api.minimaxi.com/v1';
+
+    this.logger.info('上传音频文件', { filename: file.originalname, size: file.size });
+
+    try {
+      // 手动构建 multipart/form-data 请求
+      const boundary = `----FormBoundary${Math.random().toString(36).slice(2)}`;
+      const parts: Buffer[] = [];
+
+      // 添加 file 字段
+      parts.push(Buffer.from(
+        `--${boundary}\r\n` +
+        `Content-Disposition: form-data; name="file"; filename="${file.originalname}"\r\n` +
+        `Content-Type: ${file.mimetype}\r\n\r\n`
+      ));
+      parts.push(file.buffer);
+      parts.push(Buffer.from('\r\n'));
+
+      // 添加 purpose 字段
+      parts.push(Buffer.from(
+        `--${boundary}\r\n` +
+        `Content-Disposition: form-data; name="purpose"\r\n\r\n` +
+        `${purpose}\r\n`
+      ));
+
+      // 结束边界
+      parts.push(Buffer.from(`--${boundary}--\r\n`));
+
+      const body = Buffer.concat(parts);
+
+      const response = await axios({
+        method: 'POST',
+        url: `${baseUrl}/files/upload`,
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': `multipart/form-data; boundary=${boundary}`
+        },
+        data: body
+      });
+
+      const fileId = response.data?.file?.file_id;
+      if (!fileId) {
+        throw new Error('上传响应中未找到 file_id');
+      }
+
+      return fileId;
+
+    } catch (error: any) {
+      this.logger.error('音频文件上传错误', error.response?.data || error.message);
+      throw error;
+    }
+  }
 }

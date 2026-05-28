@@ -70,11 +70,10 @@ const appStore = useAppStore()
 }
 .content-area {
   flex: 1;
-  overflow: hidden;
+  overflow-y: auto;
   padding: 20px 24px 24px;
 }
 .content-inner {
-  height: 100%;
   min-height: 0;
   display: flex;
   flex-direction: column;

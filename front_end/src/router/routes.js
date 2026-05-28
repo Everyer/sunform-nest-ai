@@ -52,6 +52,12 @@ export const staticRoutes = [
         name: 'PrintTemplateDesigner',
         component: () => import('@/views/print/index.vue'),
         meta: { title: '报表打印设计器', dynamic: false, hidden: true }
+      },
+      {
+        path: 'voice/clone',
+        name: 'VoiceClone',
+        component: () => import('@/views/voice/clone.vue'),
+        meta: { title: '语音克隆', icon: 'MicOutline', dynamic: false }
       }
     ]
   }
