@@ -1,7 +1,10 @@
 <template>
   <n-card title="我发起的" size="small" :bordered="false">
     <template #header-extra>
-      <n-button type="primary" size="small" @click="goStart">发起流程</n-button>
+      <n-space size="small">
+        <PrintButton template-code="tpl_business_cojp8m" />
+        <n-button type="primary" size="small" @click="goStart">发起流程</n-button>
+      </n-space>
     </template>
 
     <n-data-table
@@ -20,6 +23,7 @@ import { ref, reactive, h, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { NButton, NTag, NSpace } from 'naive-ui'
 import { getInstancePage, withdrawInstance } from '@/api/workflow/instance'
+import PrintButton from '@/components/PrintButton/index.vue'
 
 const router = useRouter()
 const loading = ref(false)

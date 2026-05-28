@@ -19,3 +19,7 @@ export function updatePrintTemplate(data) {
 export function deletePrintTemplate(id) {
   return request.post('/print-template/delete', { id })
 }
+
+export function getPrintTemplateByCode(templateId, appId) {
+  return request.post('/print-template/getByCode', { templateId, appId })
+}

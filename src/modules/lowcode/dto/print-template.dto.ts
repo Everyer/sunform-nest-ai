@@ -62,6 +62,16 @@ export class PrintTemplateCreateDto extends BaseCreateDto {
     @IsString()
     @IsOptional()
     readonly remark?: string;
+
+    @ApiProperty({ description: '数据接口请求方法 GET/POST', example: "POST", required: false })
+    @IsString()
+    @IsOptional()
+    readonly testMethod?: string;
+
+    @ApiProperty({ description: '数据接口高级请求参数 JSON', example: '{}', required: false })
+    @IsString()
+    @IsOptional()
+    readonly testParams?: string;
 }
 
 export class PrintTemplateUpdateDto extends PrintTemplateCreateDto {

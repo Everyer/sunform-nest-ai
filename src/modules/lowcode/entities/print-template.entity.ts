@@ -91,4 +91,19 @@ export class PrintTemplate extends BaseHasUserModel {
         comment: "备注信息"
     })
     remark: string;
+
+    @Column({
+        type: DataTypes.STRING(10),
+        allowNull: true,
+        defaultValue: 'GET',
+        comment: "数据接口请求方法 GET/POST"
+    })
+    testMethod: string;
+
+    @Column({
+        type: DataTypes.TEXT,
+        allowNull: true,
+        comment: "数据接口高级请求参数 JSON"
+    })
+    testParams: string;
 }

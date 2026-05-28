@@ -1118,6 +1118,20 @@ const triggerPrint = () => {
 
 .btn-print-trigger {
   padding: 8px 20px;
+  background-color: #f59e0b;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: background-color 0.2s;
+}
+.btn-print-trigger:hover {
+  background-color: #d97706;
 }
 
 /* 滚动预览视口 */

@@ -2775,6 +2775,8 @@ const saveTemplate = async () => {
       templateId: templateId.value,
       templateName: templateName.value,
       apiPath: apiPath.value,
+      testMethod: testMethod.value,
+      testParams: testParams.value,
       paperSizePreset: paperSizePreset.value,
       paperWidth: paperWidth.value,
       paperHeight: paperHeight.value,
@@ -2821,6 +2823,8 @@ const loadSavedTemplate = async () => {
         templateId.value = res.templateId;
         templateName.value = res.templateName;
         apiPath.value = res.apiPath || '/api/v1/business/detail';
+        testMethod.value = res.testMethod || 'GET';
+        testParams.value = res.testParams || '{}';
         paperSizePreset.value = res.paperSizePreset || 'A4';
         paperWidth.value = res.paperWidth || 210;
         paperHeight.value = res.paperHeight || 297;
