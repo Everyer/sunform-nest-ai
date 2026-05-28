@@ -15,6 +15,12 @@ import * as express from 'express';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  // 开启全局 CORS 跨域，支持外部系统通过 Ajax 调用设计器相关免检接口
+  app.enableCors({
+    origin: '*',
+    credentials: true,
+  });
+
   // 配置请求体大小限制
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ limit: '50mb', extended: true }));

@@ -1,10 +1,34 @@
 <script setup>
 import { NConfigProvider, NMessageProvider, NDialogProvider, NGlobalStyle, darkTheme, useMessage, useDialog } from 'naive-ui'
 import { useAppStore } from '@/store/useAppStore'
-import { computed, defineComponent } from 'vue'
+import { computed, defineComponent, onMounted, ref, onErrorCaptured } from 'vue'
 import GlobalAiChat from '@/components/ai/GlobalAiChat.vue'
 
 const appStore = useAppStore()
+const globalError = ref(null)
+
+// 🌟 判定在嵌入预览模式与独立打印页面下，隐藏全局 AI 助手气泡以保持页面整洁纯粹
+const showGlobalAi = computed(() => {
+  if (typeof window === 'undefined') return true
+  const hash = window.location.hash || ''
+  const pathname = window.location.pathname || ''
+  return !hash.includes('/public/print/designer') && !pathname.includes('/public/print/designer')
+})
+
+onErrorCaptured((err) => {
+  globalError.value = err
+  console.error('[Global App Error Boundary]', err)
+  return false // prevent error from propagating further
+})
+
+onMounted(() => {
+  // 🌟 全局防污染自愈防错机制：一旦挂载，立刻强力检查并铲除任何可能残留的 layout 污染类，保障所有通用列表绝对正常渲染！
+  const layout = document.querySelector('.app-layout')
+  if (layout) {
+    layout.classList.remove('layout-content-fullpage')
+    console.log('[Global App Setup] Successfully sanitized app layout from residues.');
+  }
+})
 
 // 在 provider 树内部设置 window.$message（注册为组件，渲染 null）
 const GlobalSetup = defineComponent({
@@ -166,7 +190,17 @@ function darken(color, percent) {
 </script>
 
 <template>
+  <div v-if="globalError" style="padding: 24px; background-color: #fee2e2; color: #dc2626; font-family: monospace; border: 2px solid #fca5a5; border-radius: 12px; margin: 24px; font-size: 13.5px; line-height: 1.6; text-align: left; overflow: auto; max-height: 90vh; box-shadow: 0 10px 25px rgba(220, 38, 38, 0.15); box-sizing: border-box;">
+    <h3 style="margin: 0 0 12px 0; font-weight: bold; font-size: 16px; display: flex; align-items: center; gap: 8px;">
+      🔴 页面运行或渲染时发生崩溃性错误 (Setup / Render Crash)
+    </h3>
+    <div style="background-color: #ffffff; border: 1px solid #fee2e2; padding: 16px; border-radius: 8px; overflow: auto;">
+      <pre style="margin: 0; white-space: pre-wrap; word-break: break-all; color: #1e293b;">{{ globalError.stack || globalError.message || globalError }}</pre>
+    </div>
+    <p style="margin: 12px 0 0 0; font-size: 11.5px; color: #64748b;">💡 建议截取此错误信息或根据控制台报错指示进行文件代码排查。</p>
+  </div>
   <n-config-provider
+    v-else
     :theme-overrides="themeOverrides"
     :theme="appStore.theme === 'dark' ? darkTheme : null"
   >
@@ -180,7 +214,7 @@ function darken(color, percent) {
           </transition>
         </router-view>
         <!-- 全局 AI 智能填报与指令助手 -->
-        <GlobalAiChat />
+        <GlobalAiChat v-if="showGlobalAi" />
       </n-dialog-provider>
     </n-message-provider>
   </n-config-provider>
@@ -190,6 +224,7 @@ function darken(color, percent) {
 * { box-sizing: border-box; margin: 0; }
 
 html, body { height: 100%; }
+#app { height: 100vh; }
 
 body {
   font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;

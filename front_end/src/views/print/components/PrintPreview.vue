@@ -1,9 +1,9 @@
 <template>
   <div class="print-preview-overlay">
-    <!-- 顶部操作条 (打印时在媒体查询中会自动隐藏) -->
-    <div class="preview-actions-bar">
+    <!-- 顶部操作条 (打印时在媒体查询中会自动隐藏, 嵌入预览模式下完全不显示) -->
+    <div v-if="!isEmbedPreview" class="preview-actions-bar">
       <div class="actions-left">
-        <button class="btn-preview-back" @click="$emit('close')">
+        <button v-if="!isEmbedPreview" class="btn-preview-back" @click="$emit('close')">
           ← 返回设计器
         </button>
         <span class="preview-title">打印预览 & 导出 PDF</span>
@@ -291,6 +291,11 @@ const props = defineProps({
   testBusinessId: {
     type: String,
     default: ''
+  },
+  // 🌟 是否处于纯预览模式（宿主项目 iframe 嵌入）
+  isEmbedPreview: {
+    type: Boolean,
+    default: false
   }
 });
 
@@ -691,8 +696,8 @@ const measureAndPaginate = async () => {
 
 // 触发钩子
 onMounted(async () => {
-  // 🔍 预览入口：自动调接口加载真实数据并执行排版
-  if (props.apiPath && props.apiPath.trim()) {
+  // 🔍 预览入口：在非嵌入白名单模式（没有外部主动喂入数据）时，才自动调接口联调
+  if (props.apiPath && props.apiPath.trim() && !props.isEmbedPreview && !props.runtimeData) {
     await fetchRealBusinessData();
   }
   measureAndPaginate();
@@ -705,6 +710,10 @@ watch(() => props.elements, () => {
 watch(() => props.isLandscape, () => {
   measureAndPaginate();
 });
+
+watch(() => props.runtimeData, () => {
+  measureAndPaginate();
+}, { deep: true });
 
 watch(() => listData.value, () => {
   measureAndPaginate();
@@ -1059,16 +1068,20 @@ const triggerPrint = () => {
     }, 1500);
   }, 400);
 };
+
+defineExpose({
+  triggerPrint
+});
 </script>
 
 <style>
 /* 预览覆盖视图层 */
 .print-preview-overlay {
-  position: fixed;
+  position: absolute;
   top: 0;
   left: 0;
-  width: 100vw;
-  height: 100vh;
+  width: 100%;
+  height: 100%;
   background-color: #1e293b;
   display: flex;
   flex-direction: column;

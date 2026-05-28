@@ -1,7 +1,16 @@
 <template>
-  <div class="report-designer-app" :class="{ 'is-preview-mode': isPreview }" style="display: flex; flex-direction: column; overflow: hidden; height: 100%;">
-    <!-- 设计模式下的主 UI -->
-    <div v-show="!isPreview" style="display: flex; flex-direction: column; flex: 1; min-height: 0; height: 100%; width: 100%; overflow: hidden;">
+  <div 
+    class="report-designer-app" 
+    :class="{ 'is-preview-mode': isPreview }" 
+    :style="{
+      display: 'flex',
+      flexDirection: 'column',
+      overflow: 'hidden',
+      height: isEmbedPreview ? '100vh' : '100%'
+    }"
+  >
+    <!-- 设计模式下的主 UI (嵌入预览模式下从第一帧起就隐藏，避免闪现设计器) -->
+    <div v-show="!isPreview && !isEmbedPreview" style="display: flex; flex-direction: column; flex: 1; min-height: 0; height: 100%; width: 100%; overflow: hidden;">
       <!-- 顶部功能工具栏 -->
       <header class="designer-header">
         <div class="header-left">
@@ -880,10 +889,11 @@
       </main>
     </div>
 
-    <!-- 预览与打印排版接管视图 -->
-    <div v-show="isPreview" style="display: flex; flex-direction: column; flex: 1; min-height: 0; height: 100%; width: 100%; overflow: auto;">
+    <!-- 预览与打印排版接管视图 (嵌入模式下容器立即可见，PrintPreview 等模板加载后再挂载) -->
+    <div v-show="isPreview || isEmbedPreview" style="position: relative; display: flex; flex-direction: column; flex: 1; min-height: 0; height: 100%; width: 100%; overflow: hidden;">
       <PrintPreview 
         v-if="isPreview"
+        ref="printPreviewRef"
         :elements="elements"
         :paper-width="paperWidth"
         :paper-height="paperHeight"
@@ -894,6 +904,7 @@
         :test-method="testMethod"
         :test-params="testParams"
         :test-business-id="testBusinessId"
+        :is-embed-preview="isEmbedPreview"
         @close="exitPreview"
       />
     </div>
@@ -907,11 +918,40 @@ import Ruler from './components/Ruler.vue';
 import DesignCanvas from './components/DesignCanvas.vue';
 import PrintPreview from './components/PrintPreview.vue';
 import AiChat from '@/components/ai/AiChat.vue';
+
+const printPreviewRef = ref(null);
 import { mockData, reportMockData, deliveryMockData, assetMockData } from './utils/mockData.js';
 import { getPrintTemplateDetail, updatePrintTemplate } from '@/api/printTemplate';
 
 const route = useRoute();
-const dbRecordId = ref(route.query.id || ''); // 数据库记录主键 ID
+
+// 🔑 极智容错：保障在任何 Vue 实例或 iframe 加载尚未就绪阶段均可 100% 正确、同步获取 URL 中的 query 参数而不发生报错
+const getQueryParam = (name) => {
+  try {
+    if (route && route.query && route.query[name]) {
+      return route.query[name];
+    }
+  } catch (e) {}
+  try {
+    const hash = window.location.hash || '';
+    const queryIdx = hash.indexOf('?');
+    if (queryIdx !== -1) {
+      const searchParams = new URLSearchParams(hash.substring(queryIdx + 1));
+      if (searchParams.has(name)) {
+        return searchParams.get(name);
+      }
+    }
+  } catch (e) {}
+  try {
+    const searchParams = new URLSearchParams(window.location.search);
+    if (searchParams.has(name)) {
+      return searchParams.get(name);
+    }
+  } catch (e) {}
+  return '';
+};
+
+const dbRecordId = ref(getQueryParam('id')); // 数据库记录主键 ID
 
 
 defineOptions({ name: "ReportPrintDesigner" });
@@ -968,6 +1008,18 @@ const pageMargins = reactive({
 // 视图控制
 const isPreview = ref(false);
 const activeTab = ref('style');
+
+// 智能判定是否处于无设计界面的“嵌入式纯预览/打印模式”
+const isEmbedPreview = computed(() => {
+  const hash = window.location.hash || '';
+  const pathname = window.location.pathname || '';
+  const search = window.location.search || '';
+  return hash.includes('/public/print/designer') || 
+         pathname.includes('/public/print/designer') || 
+         search.includes('mode=preview') ||
+         (route && route.path && route.path.includes('/public/print/designer')) || 
+         (route && route.query && route.query.mode === 'preview');
+});
 
 // AI 智能生成报表
 const aiIncludeTestData = ref(true);
@@ -1613,8 +1665,9 @@ const enterPreview = async () => {
     return;
   }
   
-  // 🔍 预览入口：如果配置了接口，在渲染预览组件前重新调一遍接口获取最新真实业务数据
-  if (apiPath.value && apiPath.value.trim()) {
+  // 🔍 预览入口：仅在非嵌入模式且没有外部注入数据时，才走接口拉取真实业务数据
+  // 嵌入模式下数据通过 postMessage 由宿主系统注入，不需要再调测试接口
+  if (apiPath.value && apiPath.value.trim() && !isEmbedPreview.value && !testDebugData.value) {
     try {
       window.$message?.info('正在静默同步最新测试接口业务数据，请稍候...');
       await handleFetchTestData();
@@ -2969,47 +3022,69 @@ const clearTestData = () => {
   window.$message?.info('已恢复为设计器默认 Mock 演示数据源。');
 };
 
-onMounted(async () => {
-  window.addEventListener('keydown', handleKeyDown);
+const handlePostMessage = (event) => {
+  if (!event.data) return;
   
-  // 智能给 Layout 容器加上全屏铺满专属类，实现免 padding 及溢出裁剪
-  const layout = document.querySelector('.app-layout');
-  if (layout) {
-    layout.classList.add('layout-content-fullpage');
+  const { type, data } = event.data;
+  
+  if (type === 'INJECT_PRINT_DATA') {
+    console.log('[Embedded Print Designer] Received INJECT_PRINT_DATA, keys:', data ? Object.keys(data) : 'null');
+    testDebugData.value = data;
+    console.log('[Embedded Print Designer] testDebugData updated. isPreview:', isPreview.value, 'elements count:', elements.value.length);
+    
+    // 🌟 如果已经处于预览模式但之前是空数据渲染的，需要强制退出再进入以触发 PrintPreview 重新初始化
+    if (isPreview.value && elements.value.length > 0) {
+      // 短暂切换触发 PrintPreview 重新挂载，确保新数据生效
+      isPreview.value = false;
+      setTimeout(() => {
+        isPreview.value = true;
+        console.log('[Embedded Print Designer] Re-entered preview mode with injected data.');
+      }, 100);
+    }
   }
   
+  if (type === 'TRIGGER_PREVIEW_PRINT') {
+    if (isPreview.value && printPreviewRef.value) {
+      console.log('[Embedded Print Designer] Directly triggering inner PrintPreview.triggerPrint()');
+      printPreviewRef.value.triggerPrint();
+    } else {
+      enterPreview();
+    }
+  }
+};
+
+onMounted(async () => {
+  window.addEventListener('keydown', handleKeyDown);
+  window.addEventListener('message', handlePostMessage);
 
   // 智能挂载：如果有 query.id 则从 Nest 动态获取，否则加载默认示例
+  // 🔑 关键修复：先加载模板数据，再进入预览模式，避免 PrintPreview 在 elements 为空时就被挂载渲染
   const loaded = await loadSavedTemplate();
   if (!loaded) {
     loadDefaultTemplate();
+  }
+
+  // 🌟 若处于纯预览模式下（iframe 嵌入场景），在模板加载完成后再切入预览画卷模式
+  if (isEmbedPreview.value) {
+    console.log('[Embed Preview] Template loaded. Elements count:', elements.value.length, 'Entering preview mode...');
+    isPreview.value = true;
+    
+    // 🔑 通知宿主页面：iframe 内页面已就绪，可以发送数据了
+    // 解决 postMessage 时序竞争：宿主可能在 iframe load 时已经发了消息但 Vue 还没 mount
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({ type: 'PRINT_IFRAME_READY' }, '*');
+      console.log('[Embed Preview] Sent PRINT_IFRAME_READY to parent.');
+    }
   }
 });
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', handleKeyDown);
-  
-  // 离开设计器时移除全屏铺满类，完美还原其他页面的原本布局
-  const layout = document.querySelector('.app-layout');
-  if (layout) {
-    layout.classList.remove('layout-content-fullpage');
-  }
+  window.removeEventListener('message', handlePostMessage);
 });
 </script>
 
 <style>
-/* 当设计器载入时，重写后台内容容器样式以实现 100% 极致无缝铺满 */
-.layout-content-fullpage .content-area {
-  padding: 0 !important;
-  overflow: hidden !important;
-  display: flex !important;
-  flex-direction: column !important;
-}
-.layout-content-fullpage .content-inner {
-  flex: 1 !important;
-  min-height: 0 !important;
-  height: 100% !important;
-}
 
 /* 全局页面美化，应用富视觉设计 */
 .report-designer-app {

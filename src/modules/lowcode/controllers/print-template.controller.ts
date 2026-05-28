@@ -35,8 +35,6 @@ export class PrintTemplateController {
     return await this.service.findPageList(dto);
   }
 
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
   @Post('detail')
   @ApiOperation({ summary: '获取打印模板配置详情' })
   async detail(@Body() dto: { id: string }) {
@@ -44,8 +42,6 @@ export class PrintTemplateController {
   }
 
   // 开放接口给其它项目：直接通过 templateId 获取模板
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
   @Post('getByCode')
   @ApiOperation({ summary: '外部项目根据代码动态拉取打印配置' })
   async getByCode(@Body() dto: { templateId: string, appId?: string }) {

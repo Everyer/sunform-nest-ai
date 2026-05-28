@@ -1,5 +1,5 @@
 <template>
-  <div class="app-layout">
+  <div class="app-layout" :class="{ 'layout-content-fullpage': route.name === 'PrintTemplateDesigner' }">
     <!-- Mobile backdrop -->
     <div
       class="mobile-backdrop"
@@ -34,8 +34,10 @@ import Sidebar from './sidebar/index.vue'
 import AppHeader from './header/index.vue'
 import AppTabs from './tabs/index.vue'
 import { useAppStore } from '@/store/useAppStore'
+import { useRoute } from 'vue-router'
 
 const appStore = useAppStore()
+const route = useRoute()
 </script>
 
 <style scoped>
@@ -70,13 +72,27 @@ const appStore = useAppStore()
 }
 .content-area {
   flex: 1;
-  overflow-y: auto;
+  overflow: hidden;
   padding: 20px 24px 24px;
 }
 .content-inner {
+  height: 100%;
   min-height: 0;
   display: flex;
   flex-direction: column;
+}
+
+/* 当设计器载入时，重写后台内容容器样式以实现 100% 极致无缝铺满 */
+.layout-content-fullpage .content-area {
+  padding: 0 !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+.layout-content-fullpage .content-inner {
+  flex: 1 !important;
+  min-height: 0 !important;
+  height: 100% !important;
 }
 
 @media (max-width: 768px) {

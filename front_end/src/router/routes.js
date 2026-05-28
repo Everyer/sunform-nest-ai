@@ -6,6 +6,12 @@ export const staticRoutes = [
     meta: { title: '登录', whiteList: true }
   },
   {
+    path: '/public/print/designer',
+    name: 'PublicPrintTemplateDesigner',
+    component: () => import('@/views/print/index.vue'),
+    meta: { title: '嵌入式打印设计器', whiteList: true, dynamic: false }
+  },
+  {
     path: '/',
     name: 'root',
     component: () => import('@/layout/index.vue'),
