@@ -1782,6 +1782,37 @@ const extractAndApplyElementsJson = (text) => {
     } else if (parsed && typeof parsed === 'object') {
       if (Array.isArray(parsed.elements)) {
         finalElements = parsed.elements;
+      } else {
+        // 智能遍历所有 key，寻找符合特征的数组 (例如: currentElements, items, elementList 等)
+        const keys = Object.keys(parsed);
+        const likelyArrayKey = keys.find(key => {
+          const val = parsed[key];
+          return Array.isArray(val) && (
+            key.toLowerCase().includes('element') || 
+            key.toLowerCase().includes('item') || 
+            key.toLowerCase().includes('list') ||
+            key.toLowerCase().includes('component')
+          );
+        });
+        
+        if (likelyArrayKey) {
+          finalElements = parsed[likelyArrayKey];
+        } else {
+          // 兜底找任何包含了具有典型元素特征对象的第一个数组
+          const anyArrayKey = keys.find(key => {
+            const val = parsed[key];
+            return Array.isArray(val) && val.length > 0 && val.every(item => item && typeof item === 'object' && ('type' in item || 'id' in item));
+          });
+          if (anyArrayKey) {
+            finalElements = parsed[anyArrayKey];
+          } else {
+            // 实在找不到，取第一个数组
+            const firstArrayKey = keys.find(key => Array.isArray(parsed[key]));
+            if (firstArrayKey) {
+              finalElements = parsed[firstArrayKey];
+            }
+          }
+        }
       }
       if (parsed.paperSizePreset) paperPreset = parsed.paperSizePreset;
       if (parsed.isLandscape !== undefined) isLand = parsed.isLandscape;

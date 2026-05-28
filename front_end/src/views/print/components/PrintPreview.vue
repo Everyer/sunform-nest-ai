@@ -71,7 +71,7 @@
                           border: '1px solid #94a3b8'
                         }"
                       >
-                        {{ interpolate(cell.title, page.pageIndex, renderPages.length) }}
+                        {{ interpolate(cell.title, page.pageIndex, finalPages.length) }}
                       </th>
                     </tr>
                   </template>
@@ -124,7 +124,7 @@
                 v-if="el.type === 'text'" 
                 class="el-text-render"
                 :style="getTextStyle(el)"
-                v-html="interpolate(el.value, page.pageIndex, renderPages.length)"
+                v-html="interpolate(el.value, page.pageIndex, finalPages.length)"
               >
               </div>
               
@@ -134,7 +134,7 @@
                 class="el-text-render"
                 :style="getTextStyle(el)"
               >
-                第 {{ page.pageIndex }} 页 / 共 {{ renderPages.length }} 页
+                第 {{ page.pageIndex }} 页 / 共 {{ finalPages.length }} 页
               </div>
               
               <!-- 图片 -->
@@ -184,7 +184,7 @@
                     />
                   </g>
                 </svg>
-                <div v-if="el.showText !== false" class="barcode-label">{{ interpolate(el.value, page.pageIndex, renderPages.length) }}</div>
+                <div v-if="el.showText !== false" class="barcode-label">{{ interpolate(el.value, page.pageIndex, finalPages.length) }}</div>
               </div>
             </div>
 
