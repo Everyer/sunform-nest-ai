@@ -9,6 +9,7 @@
     "build": "nest build && npm run copy:package",
     "build:prod": "nest build && npm run copy:package",
     "copy:package": "node scripts/copy-package.js",
+    "deploy": "node scripts/deploy.js",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",

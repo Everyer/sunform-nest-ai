@@ -5,6 +5,10 @@ build/
 .history
 .agent/
 
+# frontend build artifacts
+front_end/dist/
+public/admin/
+
 # Logs
 logs
 *.log

@@ -1,169 +1,23 @@
 <!doctype html>
-<html lang="en">
-
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>通用后台</title>
-  <style>
-    .vaa-home {
-      position: absolute;
-      z-index: 10000;
-      top: 0;
-      left: 0;
-      height: 100%;
-      width: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-direction: column;
-      -webkit-user-select: none;
-         -moz-user-select: none;
-              user-select: none;
-      color: #409EFF;
-      /* background-color: rgb(236, 245, 255); */
-      background-color: #fafafa;
-    }
-
-    .title {
-      font-size: 24px;
-      margin-top: 30px;
-    }
-
-    .la-line-scale-pulse-out,
-    .la-line-scale-pulse-out>div {
-      position: relative;
-      box-sizing: border-box;
-    }
-
-    .la-line-scale-pulse-out {
-      display: block;
-      font-size: 0;
-      color: #fff;
-    }
-
-    .la-line-scale-pulse-out.la-dark {
-      color: #333;
-    }
-
-    .la-line-scale-pulse-out>div {
-      display: inline-block;
-      float: none;
-      background-color: #409EFF;
-      border: 0 solid #409EFF;
-    }
-
-    .la-line-scale-pulse-out {
-      width: 120px;
-      height: 96px;
-    }
-
-    .la-line-scale-pulse-out>div {
-      width: 12px;
-      height: 96px;
-      margin: 6px;
-      margin-top: 0;
-      margin-bottom: 0;
-      border-radius: 0;
-      animation: line-scale-pulse-out .9s infinite cubic-bezier(.85, .25, .37, .85);
-    }
-
-    .la-line-scale-pulse-out>div:nth-child(3) {
-      animation-delay: -.9s;
-    }
-
-    .la-line-scale-pulse-out>div:nth-child(2),
-    .la-line-scale-pulse-out>div:nth-child(4) {
-      animation-delay: -.7s;
-    }
-
-    .la-line-scale-pulse-out>div:nth-child(1),
-    .la-line-scale-pulse-out>div:nth-child(5) {
-      animation-delay: -.5s;
-    }
-
-    .la-line-scale-pulse-out.la-sm {
-      width: 20px;
-      height: 16px;
-    }
-
-    .la-line-scale-pulse-out.la-sm>div {
-      width: 2px;
-      height: 16px;
-      margin: 1px;
-      margin-top: 0;
-      margin-bottom: 0;
-    }
-
-    .la-line-scale-pulse-out.la-2x {
-      width: 80px;
-      height: 64px;
-    }
-
-    .la-line-scale-pulse-out.la-2x>div {
-      width: 8px;
-      height: 64px;
-      margin: 4px;
-      margin-top: 0;
-      margin-bottom: 0;
-    }
-
-    .la-line-scale-pulse-out.la-3x {
-      width: 120px;
-      height: 96px;
-    }
-
-    .la-line-scale-pulse-out.la-3x>div {
-      width: 12px;
-      height: 96px;
-      margin: 6px;
-      margin-top: 0;
-      margin-bottom: 0;
-    }
-
-    /*
-   * Animation
-   */
-
-    @keyframes line-scale-pulse-out {
-      0% {
-        transform: scaley(1);
-      }
-
-      50% {
-        transform: scaley(.3);
-      }
-
-      100% {
-        transform: scaley(1);
-      }
-    }
-  </style>
-  <script type="module" crossorigin src="./static/js/index-UVQgCqtB.js"></script>
-  <link rel="modulepreload" crossorigin href="./static/js/vendor-Bv78k0Lp.js">
-  <link rel="stylesheet" crossorigin href="./static/css/index-Bqrq8H41.css">
-</head>
-
-<body>
-  <div id="app"></div>
-  <div class="vaa-home">
-    <!-- <img src="/logo2.png" alt="" class="logo"> -->
-    <div class="la-line-scale-pulse-out">
-      <div></div>
-      <div></div>
-      <div></div>
-      <div></div>
-      <div></div>
-    </div>
-  </div>
-  <script>
-    window.onload = function () {
-      var vaaHome = document.getElementsByClassName('vaa-home')[0];
-      setTimeout(() => {
-        vaaHome.style.display = 'none';
-      }, 500);
-    }
-  </script>
-</body>
-
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/static/admin/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+    <title>Admin System - 后台管理系统</title>
+    <script type="module" crossorigin src="/static/admin/assets/index-C8iYfqsT.js"></script>
+    <link rel="modulepreload" crossorigin href="/static/admin/assets/_plugin-vue_export-helper-1r9tKl2A.js">
+    <link rel="modulepreload" crossorigin href="/static/admin/assets/rolldown-runtime-DWdDZTNf.js">
+    <link rel="modulepreload" crossorigin href="/static/admin/assets/vue.esm-bundler-6tOm5I7V.js">
+    <link rel="modulepreload" crossorigin href="/static/admin/assets/download-COJ0t5G7.js">
+    <link rel="modulepreload" crossorigin href="/static/admin/assets/get-slot-CYv6j0er.js">
+    <link rel="modulepreload" crossorigin href="/static/admin/assets/useAppStore-CjoAvHea.js">
+    <link rel="stylesheet" crossorigin href="/static/admin/assets/index-Bev8tzyw.css">
+  </head>
+  <body>
+    <div id="app"></div>
+  </body>
 </html>
