@@ -30,6 +30,12 @@ export class SkillManager {
           skills.push(meta);
         } else if (file.endsWith(".js") || file.endsWith(".ts")) {
           if (file.endsWith(".d.ts")) continue;
+          // 在 dist 打包环境下，.ts 源文件和 .js 编译文件共存
+          // 优先加载 .js，如果同名 .js 已存在则跳过 .ts 避免 SyntaxError
+          if (file.endsWith(".ts")) {
+            const jsCounterpart = file.replace(/\.ts$/, '.js');
+            if (files.includes(jsCounterpart)) continue;
+          }
           const fullPath = path.join(this.skillsDir, file);
           try {
             delete require.cache[require.resolve(fullPath)];

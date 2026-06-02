@@ -1,3 +1,6 @@
+// Windows 控制台 Quick Edit Mode 修复（必须在任何输出之前执行）
+try { require('./utils/win-console-fix').disableQuickEditMode(); } catch(e) {}
+
 import * as dotenv from 'dotenv';
 dotenv.config({ override: true });
 

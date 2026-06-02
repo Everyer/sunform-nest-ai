@@ -90,23 +90,34 @@ NODE_ENV=production node main.js
 `;
 
 const startScriptWin = `@echo off
-REM 生产环境启动脚本 (Windows)
+chcp 65001 >nul 2>&1
+title SunForm-NestAI Server
 
-echo 🚀 启动 Nest.js 应用...
-echo 📍 当前目录: %CD%
-echo 📦 Node.js 版本:
+REM ============================================================
+REM 关闭 Windows CMD "快速编辑模式" (Quick Edit Mode)
+REM 解决：AI 流式输出时点击控制台导致进程冻结的问题
+REM ============================================================
+powershell -NoProfile -Command "$k32 = Add-Type -MemberDefinition '[DllImport(\\\"kernel32.dll\\\", SetLastError=true)] public static extern IntPtr GetStdHandle(int h); [DllImport(\\\"kernel32.dll\\\", SetLastError=true)] public static extern bool GetConsoleMode(IntPtr h, out uint m); [DllImport(\\\"kernel32.dll\\\", SetLastError=true)] public static extern bool SetConsoleMode(IntPtr h, uint m);' -Name 'K32' -Namespace 'Win32' -PassThru; $hnd = $k32::GetStdHandle(-10); [uint32]$mode = 0; $k32::GetConsoleMode($hnd, [ref]$mode) | Out-Null; $mode = $mode -band (-bnot 0x0040); $k32::SetConsoleMode($hnd, $mode) | Out-Null; Write-Host '[OK] Quick Edit Mode disabled'" 2>nul
+
+REM 生产环境启动脚本 (Windows)
+echo.
+echo ========================================
+echo   SunForm-NestAI Production Server
+echo ========================================
+
+echo Node.js version:
 node --version
-echo 📦 NPM 版本:
+echo NPM version:
 npm --version
 
 REM 检查依赖是否已安装
 if not exist "node_modules" (
-    echo 📦 安装生产依赖...
+    echo Installing production dependencies...
     npm install --only=production
 )
 
 REM 启动应用
-echo 🎯 启动应用...
+echo Starting application...
 set NODE_ENV=production
 node main.js
 `;
