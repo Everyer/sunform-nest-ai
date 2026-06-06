@@ -84,8 +84,21 @@ export const useMenuStore = defineStore('menu', () => {
     // Build nested routes: parent menus use EmptyLayout, children nest under them
     function addMenuRoutes(menuItems, parentName = 'root', parentPath = '') {
       for (const menu of menuItems) {
-        const routePath = menu.path.startsWith('/') ? menu.path.slice(1) : menu.path
         const fullPath = menu.path.startsWith('/') ? menu.path : `${parentPath}/${menu.path}`
+        // 子级 routePath 必须相对父级，否则 vue-router 会拼成 /parent/parent/child
+        let routePath
+        if (!parentPath) {
+          // 顶级：去掉前导 /
+          routePath = fullPath.replace(/^\//, '')
+        } else if (fullPath === parentPath) {
+          // 子路径与父级相同（如 /knowledge → 知识库管理）
+          routePath = ''
+        } else if (fullPath.startsWith(parentPath + '/')) {
+          // 去掉父级前缀，保留后缀
+          routePath = fullPath.slice(parentPath.length + 1)
+        } else {
+          routePath = fullPath.replace(/^\//, '')
+        }
         const comp = menu.component ? createAsyncComponent(menu.component) : null
 
         if (menu.children?.length) {

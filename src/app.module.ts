@@ -55,11 +55,11 @@ import { existsSync } from 'fs';
 
         return {
           dialect: 'postgres',
-          host: configService.get('DATABASE_HOST', '150.158.93.154'),
-          port: configService.get('DATABASE_PORT', 5432),
-          username: configService.get('DATABASE_USERNAME', 'postgres'),
-          password: configService.get('DATABASE_PASSWORD', '8uYabCRurjW2iXRH9IMZ'),
-          database: configService.get('DATABASE_NAME', 'postgres'),
+          host: configService.get<string>('DATABASE_HOST'),
+          port: configService.get<number>('DATABASE_PORT'),
+          username: configService.get<string>('DATABASE_USERNAME'),
+          password: configService.get<string>('DATABASE_PASSWORD'),
+          database: configService.get<string>('DATABASE_NAME'),
           autoLoadModels: true,
           synchronize: configService.get('DB_SYNC') === 'true',
           sync: configService.get('DB_SYNC') === 'true' ? {
@@ -83,8 +83,8 @@ import { existsSync } from 'fs';
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
         store: redisStore,
-        host: configService.get('REDIS_HOST', 'localhost'),
-        port: configService.get('REDIS_PORT', 6379),
+        host: configService.get<string>('REDIS_HOST'),
+        port: configService.get<number>('REDIS_PORT'),
         ttl: 0  // 永不过期
       }),
       inject: [ConfigService],

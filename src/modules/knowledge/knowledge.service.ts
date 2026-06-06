@@ -22,42 +22,45 @@ export class KnowledgeService {
     @InjectModel(DocumentChunk)
     private chunkModel: typeof DocumentChunk,
   ) {
-    // 向量 Embedding 专用 Key（AI_EMBEDDING_API_KEY），回退到语言模型 Key
+    // 向量 Embedding 专用 Key（AI_EMBEDDING_API_KEY）
     this.embeddingApiKey = process.env.AI_EMBEDDING_API_KEY
-      || process.env.AI_AGENT_API_KEY
+      || process.env.MINIMAX_API_KEY
       || '';
     // 向量 Embedding 专用 Base URL（AI_EMBEDDING_BASE_URL），不带 /chat/completions
     const rawEmbeddingUrl = process.env.AI_EMBEDDING_BASE_URL
-      || process.env.AI_AGENT_BASE_URL
       || 'https://api.minimaxi.com/v1';
     this.embeddingBaseUrl = rawEmbeddingUrl.replace(/\/chat\/completions\/?$/, '').replace(/\/$/, '');
 
     // ✨ 服务启动时打印当前向量模型配置
     const keySource = process.env.AI_EMBEDDING_API_KEY
       ? 'AI_EMBEDDING_API_KEY'
-      : process.env.AI_AGENT_API_KEY
-      ? 'AI_AGENT_API_KEY (回退)'
-      : '硬编码默认';
+      : process.env.MINIMAX_API_KEY
+      ? 'MINIMAX_API_KEY (回退)'
+      : '未配置';
     const keyPreview = this.embeddingApiKey
       ? `${this.embeddingApiKey.substring(0, 12)}...(${this.embeddingApiKey.length}位)`
       : '未配置';
     console.log('\n🧠 [知识库-向量模块] 初始化配置:');
-    console.log(`  • 向量模型: MiniMax embo-01 (1536维)`);
+    console.log(`  • 向量模型: ${process.env.AI_EMBEDDING_MODEL || 'embo-01'} (1536维)`);
     console.log(`  • Key 来源: ${keySource}`);
     console.log(`  • Key 前缀: ${keyPreview}`);
     console.log(`  • 向量接口: ${this.embeddingBaseUrl}/embeddings`);
     console.log();
   }
 
-  // 1. 获取 1536 维文本向量数据 (MiniMax embo-01) - 使用 AI_EMBEDDING_API_KEY 专用向量 Key
+  // 1. 获取 1536 维文本向量数据 - 调用 MiniMax 原生 Embeddings API
+  //    MiniMax 接口与 OpenAI 不兼容：请求体用 {texts, type} 不是 {input}，返回用 vectors 不是 data[].embedding
+  //    文档：https://api.minimaxi.com/v1/embeddings
+  //    模型：embo-01（1536 维，与 document_chunks.embedding 列匹配）
   async getEmbedding(text: string, type: 'db' | 'query' = 'db'): Promise<number[]> {
     const textPreview = text.length > 30 ? text.substring(0, 30) + '...' : text;
-    console.log(`🔍 [向量] 请求 MiniMax embo-01 | type=${type} | 文本前缀: "${textPreview}"`);
+    const model = process.env.AI_EMBEDDING_MODEL || 'embo-01';
+    console.log(`🔍 [向量] 请求 ${model} | type=${type} | 文本前缀: "${textPreview}"`);
     try {
       const response = await axios.post(`${this.embeddingBaseUrl}/embeddings`, {
-        model: 'embo-01',
-        texts: [text],
-        type: type
+        model,
+        texts: [text],     // MiniMax 用 texts 数组
+        type,              // 'db' 写入 / 'query' 检索
       }, {
         headers: {
           'Authorization': `Bearer ${this.embeddingApiKey}`,
@@ -65,20 +68,16 @@ export class KnowledgeService {
         },
         timeout: 15000
       });
-      
-      const baseResp = response.data?.base_resp;
-      if (baseResp && baseResp.status_code !== 0) {
-        throw new Error(`MiniMax Embedding 错误: [${baseResp.status_code}] ${baseResp.status_msg}`);
-      }
 
+      // MiniMax 返回结构：{ vectors: [[...]], base_resp: {status_code, status_msg} }
       const vector = response.data?.vectors?.[0];
       if (vector && vector.length === 1536) {
-        console.log(`  ✅ 向量获取成功 | 模型: embo-01 | 维度: ${vector.length} | 消耗 token: ${response.data?.total_tokens ?? '?'}`);
+        console.log(`  ✅ 向量获取成功 | 模型: ${model} | 维度: ${vector.length}`);
         return vector;
       }
-      throw new Error(`MiniMax 返回的向量数据格式不符: ${JSON.stringify(response.data || {})}`);
+      throw new Error(`Embedding 返回的向量数据格式不符: ${JSON.stringify(response.data || {})}`);
     } catch (err: any) {
-      console.error(`  ⚠️ MiniMax embo-01 失败，降级本地伪随机向量:`, err?.response?.data ? JSON.stringify(err.response.data) : err.message);
+      console.error(`  ⚠️ ${model} 失败，降级本地伪随机向量:`, err?.response?.data ? JSON.stringify(err.response.data) : err.message);
       return this.generateDeterministicVector(text);
     }
   }
@@ -210,6 +209,14 @@ export class KnowledgeService {
   async listDocuments(baseId: string) {
     return this.docModel.findAll({
       where: { baseId },
+      order: [['createdAt', 'DESC']]
+    });
+  }
+
+  // 列出所有知识库下的所有文档（带 baseName），用于"文档管理"页
+  async listAllDocuments() {
+    return this.docModel.findAll({
+      include: [{ model: KnowledgeBase, attributes: ['id', 'name'] }],
       order: [['createdAt', 'DESC']]
     });
   }

@@ -1,8 +1,8 @@
 // Windows 控制台 Quick Edit Mode 修复（必须在任何输出之前执行）
 try { require('./utils/win-console-fix').disableQuickEditMode(); } catch(e) {}
 
-import * as dotenv from 'dotenv';
-dotenv.config({ override: true });
+// 必须第一个 import：加载 .env 并校验必需的环境变量
+import './env';
 
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';

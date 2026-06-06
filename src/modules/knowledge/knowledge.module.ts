@@ -6,6 +6,7 @@ import { KnowledgeDocument } from './entities/knowledge-document.entity';
 import { KnowledgeService } from './knowledge.service';
 import { KnowledgeController } from './knowledge.controller';
 
+
 @Module({
   imports: [SequelizeModule.forFeature([KnowledgeBase, KnowledgeDocument, DocumentChunk])],
   controllers: [KnowledgeController],

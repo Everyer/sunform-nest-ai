@@ -7,11 +7,11 @@ dotenv.config();
 async function syncDatabase() {
   const sequelize = new Sequelize({
     dialect: 'postgres',
-    host: process.env.DATABASE_HOST || '150.158.93.154',
-    port: parseInt(process.env.DATABASE_PORT || '5432'),
-    username: process.env.DATABASE_USERNAME || 'postgres',
-    password: process.env.DATABASE_PASSWORD || '8uYabCRurjW2iXRH9IMZ',
-    database: process.env.DATABASE_NAME || 'postgres',
+    host: process.env.DATABASE_HOST,
+    port: parseInt(process.env.DATABASE_PORT || '5432', 10),
+    username: process.env.DATABASE_USERNAME,
+    password: process.env.DATABASE_PASSWORD,
+    database: process.env.DATABASE_NAME,
     logging: false,
   });
 

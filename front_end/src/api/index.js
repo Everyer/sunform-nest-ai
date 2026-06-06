@@ -103,6 +103,13 @@ service.interceptors.response.use(
   response => {
     const res = response.data
     if (res.success !== true) {
+      // 关键修复：后端部分接口在 token 失效时返回 200 + { success: false, message: '未登录或 token 已过期' }
+      // 这里统一识别业务码中的"未登录/token 失效"信息，触发 logout，避免只在路由守卫里兜底
+      const rawMsg = (res.message || '').toString()
+      if (/未登录|登录已过期|token.{0,5}(过期|失效|无效)|未授权/i.test(rawMsg)) {
+        const userStore = useUserStore()
+        userStore.logout()
+      }
       // 翻译为精美的中文，并通过 Promise.reject 抛出，由视图层的 try-catch 统一触发单次 Toast 提示，完美避免双重弹窗！
       const friendlyMsg = translateErrorMessage(res.message || '请求失败')
       return Promise.reject(new Error(friendlyMsg))

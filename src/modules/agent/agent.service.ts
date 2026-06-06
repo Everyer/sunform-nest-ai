@@ -409,12 +409,12 @@ export class AgentService implements OnModuleInit, OnModuleDestroy {
 
   private llmConfig = {
     apiKey: (process.env.AI_AGENT_API_KEY || '').trim(),
-    baseUrl: (process.env.AI_AGENT_BASE_URL || 'https://api.minimaxi.com/v1').trim(),
-    model: (process.env.AI_AGENT_MODEL || 'MiniMax-M2.7').trim(),
+    baseUrl: (process.env.AI_AGENT_BASE_URL || 'https://api.openai.com/v1').trim(),
+    model: (process.env.AI_AGENT_MODEL || 'gpt-4o-mini').trim(),
   };
   private fileManageConfig = {
     url: (process.env.FILE_MANAGE_URL || '').trim(),
-    apiKey: (process.env.FILE_MANAGE_KEY || 'sun-agent-secret-key').trim(),
+    apiKey: (process.env.FILE_MANAGE_KEY || '').trim(),
   };
   private readonly historyDir: string;
   private readonly attachmentsDir: string;

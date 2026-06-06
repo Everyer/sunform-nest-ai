@@ -38,7 +38,10 @@ router.beforeEach(async (to, from, next) => {
       return
     } catch (e) {
       console.error('Failed to generate routes:', e)
+      // 关键修复：catch 分支必须调 next，否则 vue-router 报 "Invalid navigation guard"
+      // 清理登录态（内部会 push('/login') 触发新导航），并显式取消当前导航兜底
       userStore.logout()
+      next({ path: '/login', replace: true })
       return
     }
   }

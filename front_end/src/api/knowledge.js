@@ -24,6 +24,11 @@ export function listDocuments(baseId) {
   return request.get(`/knowledge/document/list?baseId=${baseId}`)
 }
 
+// 列出所有知识库下的所有文档（用于"文档管理"菜单）
+export function listAllDocuments() {
+  return request.get('/knowledge/document/listAll')
+}
+
 export function uploadDocument(data) {
   return request.post('/knowledge/document/upload', data)
 }

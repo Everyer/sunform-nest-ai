@@ -9,8 +9,8 @@ import { JwtStrategy } from './jwt.strategy';
   imports: [
     UserModule,
     JwtModule.register({
-      secret: '#!$#%)$^%&#)$', // 建议使用环境变量
-      signOptions: { expiresIn: '24h' },
+      secret: process.env.JWT_SECRET as string,
+      signOptions: { expiresIn: process.env.JWT_EXPIRES_IN || '24h' },
     }),
   ],
   providers: [AuthService, JwtStrategy],

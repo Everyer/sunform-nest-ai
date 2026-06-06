@@ -4,11 +4,11 @@ dotenv.config();
 
 async function drop() {
   const client = new Client({
-    host: process.env.DATABASE_HOST || '150.158.93.154',
-    port: parseInt(process.env.DATABASE_PORT || '5432'),
-    user: process.env.DATABASE_USERNAME || 'postgres',
-    password: process.env.DATABASE_PASSWORD || '8uYabCRurjW2iXRH9IMZ',
-    database: process.env.DATABASE_NAME || 'postgres',
+    host: process.env.DATABASE_HOST,
+    port: parseInt(process.env.DATABASE_PORT || '5432', 10),
+    user: process.env.DATABASE_USERNAME,
+    password: process.env.DATABASE_PASSWORD,
+    database: process.env.DATABASE_NAME,
   });
   await client.connect();
   console.log('🗑️ 正在清空 PostgreSQL public 模式下的所有表...');

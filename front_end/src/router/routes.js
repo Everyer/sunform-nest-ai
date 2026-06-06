@@ -47,18 +47,8 @@ export const staticRoutes = [
         component: () => import('@/views/modules/knowledge/documents.vue'),
         meta: { title: '知识库文档管理', dynamic: false, hidden: true }
       },
-      {
-        path: 'print/list',
-        name: 'PrintTemplateList',
-        component: () => import('@/views/print/list.vue'),
-        meta: { title: '打印模板中台', icon: 'PrintOutline', dynamic: false }
-      },
-      {
-        path: 'print/designer',
-        name: 'PrintTemplateDesigner',
-        component: () => import('@/views/print/index.vue'),
-        meta: { title: '报表打印设计器', dynamic: false, hidden: true }
-      },
+      // /print/list 和 /print/designer 已交给菜单系统动态加载（见 db/seed.sql 中 5.7 / 5.8），
+      // 不再在静态路由中重复定义，否则会与动态路由冲突。
       {
         path: 'voice/clone',
         name: 'VoiceClone',

@@ -41,7 +41,7 @@ export class AiService {
     // 优先读取 AI_AGENT_BASE_URL 并自动剥离 /chat/completions 后缀，规范化为 Base URL
     const rawBaseUrl = this.configService.get<string>('AI_AGENT_BASE_URL') ||
       this.configService.get<string>('SILICONFLOW_BASE_URL') ||
-      'https://api.minimaxi.com/v1';
+      'https://api.openai.com/v1';
     this.siliconflowBaseUrl = rawBaseUrl.replace(/\/chat\/completions\/?$/, '').replace(/\/$/, '');
 
     // Coze API 配置
@@ -74,7 +74,7 @@ export class AiService {
 
       // 获取优化信息用于日志
       const managementInfo = messageManager.getManagementInfo(messagesWithRules, optimizedMessages);
-      const defaultModel = this.configService.get<string>('AI_AGENT_MODEL') || 'MiniMax-M2.7';
+      const defaultModel = this.configService.get<string>('AI_AGENT_MODEL') || 'gpt-4o-mini';
       const requestData = {
         model: model || defaultModel,
         messages: optimizedMessages,
@@ -510,7 +510,7 @@ export class AiService {
       const optimizedMessages = await messageManager.manageMessages(conversationMessages, systemMessage);
       const managementInfo = messageManager.getManagementInfo(messagesWithRules, optimizedMessages);
 
-      const defaultModel = this.configService.get<string>('AI_AGENT_MODEL') || 'MiniMax-M2.7';
+      const defaultModel = this.configService.get<string>('AI_AGENT_MODEL') || 'gpt-4o-mini';
       const requestData = {
         model: model || defaultModel,
         messages: optimizedMessages,
@@ -766,7 +766,7 @@ export class AiService {
       throw new Error('MINIMAX_API_KEY 未配置');
     }
 
-    const baseUrl = 'https://api.minimaxi.com/v1';
+    const baseUrl = this.configService.get<string>('MINIMAX_BASE_URL') || 'https://api.minimaxi.com/v1';
 
     // 构建克隆请求参数
     const requestData: any = {
@@ -864,7 +864,7 @@ export class AiService {
       throw new Error('MINIMAX_API_KEY 未配置');
     }
 
-    const baseUrl = 'https://api.minimaxi.com/v1';
+    const baseUrl = this.configService.get<string>('MINIMAX_BASE_URL') || 'https://api.minimaxi.com/v1';
 
     // 构建 T2A 请求参数（MiniMax T2A V2 格式）
     const requestData: any = {
@@ -946,7 +946,7 @@ export class AiService {
       throw new Error('MINIMAX_API_KEY 未配置');
     }
 
-    const baseUrl = 'https://api.minimaxi.com/v1';
+    const baseUrl = this.configService.get<string>('MINIMAX_BASE_URL') || 'https://api.minimaxi.com/v1';
 
     this.logger.info('上传音频文件', { filename: file.originalname, size: file.size });
 

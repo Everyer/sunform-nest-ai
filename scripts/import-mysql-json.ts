@@ -7,15 +7,15 @@ dotenv.config();
 
 // PostgreSQL 数据库连接配置
 const pgConfig = {
-  host: process.env.DATABASE_HOST || '150.158.93.154',
-  port: parseInt(process.env.DATABASE_PORT || '5432'),
-  user: process.env.DATABASE_USERNAME || 'postgres',
-  password: process.env.DATABASE_PASSWORD || '8uYabCRurjW2iXRH9IMZ',
-  database: process.env.DATABASE_NAME || 'postgres',
+  host: process.env.DATABASE_HOST,
+  port: parseInt(process.env.DATABASE_PORT || '5432', 10),
+  user: process.env.DATABASE_USERNAME,
+  password: process.env.DATABASE_PASSWORD,
+  database: process.env.DATABASE_NAME,
 };
 
-// JSON 文件所在的源目录
-const sourceDir = '/Volumes/杂七杂八/mysql 导出';
+// JSON 文件所在的源目录（可由环境变量 MYSQL_EXPORT_DIR 覆盖）
+const sourceDir = process.env.MYSQL_EXPORT_DIR || '/path/to/mysql-json-exports';
 
 // 安全的日期解析器（能够识别 "14/5/2026 07:34:14" 或标准 ISO 日期）
 function parseDateString(dateStr: any): Date | null {

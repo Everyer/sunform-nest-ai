@@ -1,5 +1,5 @@
 <template>
-  <div class="app-layout" :class="{ 'layout-content-fullpage': route.name === 'PrintTemplateDesigner' }">
+  <div class="app-layout" :class="{ 'layout-content-fullpage': route.name === 'PrintTemplateDesigner' || route.path.startsWith('/print/designer') || route.path.startsWith('/public/print/designer') }">
     <!-- Mobile backdrop -->
     <div
       class="mobile-backdrop"

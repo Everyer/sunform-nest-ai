@@ -60,6 +60,15 @@ export class KnowledgeController {
     };
   }
 
+  @ApiOperation({ summary: '获取所有知识库下的所有文档（含 baseName），用于全局文档管理' })
+  @Get('document/listAll')
+  async listAllDocuments() {
+    return {
+      success: true,
+      data: await this.service.listAllDocuments(),
+    };
+  }
+
   @ApiOperation({ summary: '上传并解析新文档' })
   @Post('document/upload')
   async uploadDocument(@Body() dto: { baseId: string; title: string; content: string; type: string }) {

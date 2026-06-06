@@ -31,12 +31,12 @@ async function upsert(sequelize, table, lookupCol, lookupVal, insertCols, insert
 
 async function initAdmin() {
   const sequelize = new Sequelize({
-    dialect: 'mysql',
-    host: process.env.DATABASE_HOST || 'localhost',
-    port: parseInt(process.env.DATABASE_PORT || '3306'),
-    username: process.env.DATABASE_USERNAME || 'root',
-    password: process.env.DATABASE_PASSWORD || '',
-    database: process.env.DATABASE_NAME || 'sunyan_nest',
+    dialect: 'postgres',
+    host: process.env.DATABASE_HOST,
+    port: parseInt(process.env.DATABASE_PORT || '5432', 10),
+    username: process.env.DATABASE_USERNAME,
+    password: process.env.DATABASE_PASSWORD,
+    database: process.env.DATABASE_NAME,
     logging: console.log,
   });
 

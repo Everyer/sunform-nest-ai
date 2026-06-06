@@ -4,6 +4,9 @@ node_modules/
 build/
 .history
 .agent/
+.harness/
+.opencode/
+.harness-bootstrap*/
 
 # frontend build artifacts
 front_end/dist/
@@ -17,6 +20,8 @@ pnpm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
+nohup.out
+npminstall-debug.log
 
 # OS
 .DS_Store
@@ -38,15 +43,16 @@ coverage/
 *.sublime-workspace
 
 # IDE - VSCode
-.vscode/*
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
+.vscode/
+!.vscode/settings.json.example
 !.vscode/extensions.json
 
-# dotenv environment variable files
+# dotenv environment variable files - 严禁入仓
 .env
+.env.*
 .env.*.local
+.env.local
+!.env.example
 
 # Runtime / temp
 pids
@@ -56,9 +62,18 @@ pids
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 .temp
 .tmp
+temp_attachments/
 
 # TypeScript
 *.tsbuildinfo
+
+# Redis 数据快照 - 含业务数据
+dump.rdb
+*.rdb
+
+# Skills / harness lock files - 本地生成，不应入仓
+**/skills-lock.json
+**/.mcp.json
 
 # Packaging
 *.node
