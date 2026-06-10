@@ -187,6 +187,14 @@ export class ImGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     notifyConversationUpdate(userId: string, conversationId: string) {
+        const socketIds = this.presence.getSockets(userId);
+        for (const sid of socketIds) {
+            const socket = this.server.sockets.sockets.get(sid);
+            if (socket) {
+                socket.join(`conv:${conversationId}`);
+                this.logger.log(`Auto join room: socket=${sid} joined conv:${conversationId}`);
+            }
+        }
         this.server.to(`user:${userId}`).emit('conversation:update', { conversationId });
     }
 

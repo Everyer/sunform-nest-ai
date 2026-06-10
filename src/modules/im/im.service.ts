@@ -92,14 +92,27 @@ export class ImService {
             lastMsgMap = new Map(lastMsgs.map((m) => [m.id, m]));
         }
 
-        // 算未读:对每个会话,统计 senderId != currentUserId 且 id > lastReadMessageId 的消息数
+        // 批量拉已读消息的创建时间(用于未读数计算，规避 UUID Op.gt 大小比较失效的问题)
+        const lastReadMsgIds = myMemberships.map((m) => m.lastReadMessageId).filter(Boolean);
+        let lastReadMsgMap = new Map<string, Message>();
+        if (lastReadMsgIds.length) {
+            const lastReadMsgs = await this.msgModel.findAll({
+                where: { id: { [Op.in]: lastReadMsgIds } },
+                attributes: ['id', 'createdAt'],
+            });
+            lastReadMsgMap = new Map(lastReadMsgs.map((m) => [m.id, m]));
+        }
+
+        // 算未读:对每个会话,统计 senderId != currentUserId 且 createdAt > lastReadMessage.createdAt 的消息数
         const result: any[] = [];
         for (const conv of conversations) {
             const myMember = myMemberMap.get(conv.id);
             const lastReadId = myMember?.lastReadMessageId;
+            const lastReadMsg = lastReadId ? lastReadMsgMap.get(lastReadId) : null;
+
             const where: any = { conversationId: conv.id, senderId: { [Op.ne]: currentUserId } };
-            if (lastReadId) {
-                where.id = { [Op.gt]: lastReadId };
+            if (lastReadMsg) {
+                where.createdAt = { [Op.gt]: lastReadMsg.getDataValue('createdAt') };
             }
             const unread = await this.msgModel.count({ where });
 

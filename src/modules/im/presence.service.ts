@@ -42,6 +42,11 @@ export class PresenceService {
         return this.socketsByUser.has(userId);
     }
 
+    getSockets(userId: string): string[] {
+        const set = this.socketsByUser.get(userId);
+        return set ? Array.from(set) : [];
+    }
+
     onlineUserIds(): string[] {
         return Array.from(this.socketsByUser.keys());
     }

@@ -13,6 +13,7 @@ import {
   clearHistory as clearHistoryApi,
 } from '@/api/im'
 import { imSocket } from '@/utils/imSocket'
+import { showNotification, getNotificationPermission, playNotificationSound } from '@/utils/notification'
 import { useUserStore } from './useUserStore'
 
 export const useImStore = defineStore('im', () => {
@@ -24,6 +25,7 @@ export const useImStore = defineStore('im', () => {
   const typingByConv = ref({}) // { convId: Set<userId> }
   const onlineUserIds = ref(new Set()) // 在线用户
   const panelOpen = ref(false)
+  const soundEnabled = ref(localStorage.getItem('im_sound_enabled') !== 'false') // 声音提醒开关，默认开启
   const loaded = ref(false) // 是否已加载过会话列表
   const loadingMessages = ref(false)
   const unreadTotal = ref(0) // 总未读(用于 header 红点)
@@ -131,7 +133,9 @@ export const useImStore = defineStore('im', () => {
         createdAt: msg.createdAt,
       }
       c.lastMessageAt = msg.createdAt || new Date().toISOString()
-      // 如果不是我发的,且当前未打开该会话,未读+1
+      // 桌面通知:仅在不是我发的、且当前未打开该会话时弹
+      const shouldNotify =
+        msg.senderId !== currentUserId.value && activeConvId.value !== convId
       if (msg.senderId !== currentUserId.value) {
         if (activeConvId.value !== convId) {
           c.unread = (c.unread || 0) + 1
@@ -141,10 +145,64 @@ export const useImStore = defineStore('im', () => {
       const item = conversations.value.splice(idx, 1)[0]
       conversations.value.unshift(item)
       computeUnread()
+      
+      // 新消息提醒与声音控制
+      if (msg.senderId !== currentUserId.value) {
+        // 判断我是否正看着当前会话
+        const lookingAtCurrentConv = panelOpen.value && activeConvId.value === convId && typeof document !== 'undefined' && !document.hidden && document.hasFocus()
+        
+        if (shouldNotify) {
+          notifyNewMessage(c, msg)
+        }
+        
+        if (soundEnabled.value && !lookingAtCurrentConv) {
+          playNotificationSound()
+        }
+        
+        if (typeof document !== 'undefined' && (document.hidden || !document.hasFocus())) {
+          startTitleFlash()
+        }
+      }
     } else {
       // 新会话被拉入:重新拉列表
       loadConversations(true).catch(() => {})
     }
+  }
+
+  // 解析发送者显示名:优先 staffName,再 username
+  function resolveSenderName(msg) {
+    const s = msg?.sender
+    if (!s) return '未知用户'
+    return s.staff?.staffName || s.username || '未知用户'
+  }
+
+  // 消息预览(把图片/文件转成可读形式)
+  function formatMessagePreview(msg) {
+    if (!msg) return ''
+    if (msg.type === 'image') return '[图片]'
+    if (msg.type === 'file') return `[文件] ${msg.attachmentName || ''}`.trim()
+    return (msg.content || '').slice(0, 80)
+  }
+
+  // 弹出桌面通知。失败 / 无权限 / 不支持均静默。
+  function notifyNewMessage(conv, msg) {
+    if (getNotificationPermission() !== 'granted') return
+    const senderName = resolveSenderName(msg)
+    const isGroup = conv.type === 'group'
+    const title = isGroup
+      ? `${senderName} · ${conv.name || '群聊'}`
+      : senderName
+    const body = formatMessagePreview(msg)
+    const avatar = msg?.sender?.avatar || ''
+    showNotification(title, {
+      body,
+      avatar,
+      tag: `im-conv-${conv.id}`, // 同会话的连发消息会合并为一条
+      onclick: () => {
+        try { window.focus() } catch (e) {}
+        try { openConversation(conv.id) } catch (e) {}
+      },
+    })
   }
 
   // ===== 实时:已读 =====
@@ -339,6 +397,14 @@ export const useImStore = defineStore('im', () => {
     unreadTotal.value = 0
   }
 
+  function setSoundEnabled(val) {
+    soundEnabled.value = val
+    localStorage.setItem('im_sound_enabled', val ? 'true' : 'false')
+    if (val) {
+      playNotificationSound()
+    }
+  }
+
   function parseJwtSub(token) {
     if (!token) return ''
     try {
@@ -365,6 +431,7 @@ export const useImStore = defineStore('im', () => {
     typingByConv,
     onlineUserIds,
     panelOpen,
+    soundEnabled,
     loadingMessages,
     unreadTotal,
     loaded,
@@ -393,5 +460,42 @@ export const useImStore = defineStore('im', () => {
     start,
     stop,
     setCurrentUser,
+    setSoundEnabled,
   }
 })
+
+// ====== 浏览器标签页 Title 闪烁提醒助手 ======
+let titleTimer = null
+let isFlashing = false
+let originalTitle = ''
+
+function startTitleFlash(text = '【您有新消息】') {
+  if (typeof document === 'undefined') return
+  if (isFlashing) return
+  if (!originalTitle) originalTitle = document.title
+  isFlashing = true
+  let show = true
+  titleTimer = setInterval(() => {
+    document.title = show ? `${text} ${originalTitle}` : `【　　　　　】 ${originalTitle}`
+    show = !show
+  }, 800)
+}
+
+function stopTitleFlash() {
+  if (typeof document === 'undefined') return
+  if (!isFlashing) return
+  clearInterval(titleTimer)
+  titleTimer = null
+  isFlashing = false
+  if (originalTitle) document.title = originalTitle
+}
+
+if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+  const clearFlash = () => {
+    if (!document.hidden) {
+      stopTitleFlash()
+    }
+  }
+  document.addEventListener('visibilitychange', clearFlash)
+  window.addEventListener('focus', clearFlash)
+}

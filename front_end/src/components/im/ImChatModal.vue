@@ -9,6 +9,42 @@
           <span v-if="store.unreadTotal > 0" class="total-badge">{{ store.unreadTotal > 99 ? '99+' : store.unreadTotal }}</span>
         </div>
         <div class="header-actions">
+          <!-- 声音提示开关 -->
+          <button
+            class="icon-btn"
+            :class="{ 'sound-on': store.soundEnabled, 'sound-off': !store.soundEnabled }"
+            :title="store.soundEnabled ? '静音消息提醒' : '开启声音提醒'"
+            @click="store.setSoundEnabled(!store.soundEnabled)"
+          >
+            <svg v-if="store.soundEnabled" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+            </svg>
+            <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+              <line x1="23" y1="9" x2="17" y2="15"></line>
+              <line x1="17" y1="9" x2="23" y2="15"></line>
+            </svg>
+          </button>
+
+          <!-- 桌面通知开关 -->
+          <button
+            v-if="notifyPerm !== 'unsupported'"
+            class="icon-btn"
+            :class="{ 
+              'notify-on': notifyPerm === 'granted', 
+              'notify-off': notifyPerm === 'default', 
+              'notify-denied': notifyPerm === 'denied' 
+            }"
+            :title="notifyPerm === 'granted' ? '桌面通知已开启' : (notifyPerm === 'denied' ? '通知权限已被禁用(点击查看如何开启)' : '开启桌面通知')"
+            @click="onToggleNotify"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+              <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+              <line v-if="notifyPerm === 'default' || notifyPerm === 'denied'" x1="2" y1="2" x2="22" y2="22"/>
+            </svg>
+          </button>
           <button class="icon-btn" :title="maximized ? '还原' : '最大化'" @click="maximized = !maximized">
             <svg v-if="!maximized" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
             <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 14h6v6M20 10h-6V4M14 10l7-7M10 14l-7 7"/></svg>
@@ -47,8 +83,10 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { useDialog, useMessage } from 'naive-ui'
 import { useImStore } from '@/store/useImStore'
 import { useUserStore } from '@/store/useUserStore'
+import { getNotificationPermission, requestNotificationPermission } from '@/utils/notification'
 import ConversationList from './ConversationList.vue'
 import ChatWindow from './ChatWindow.vue'
 import NewChatDialog from './NewChatDialog.vue'
@@ -59,16 +97,65 @@ const maximized = ref(false)
 const showNewChat = ref(false)
 const isMobile = ref(false)
 const mobileView = ref('list') // 'list' | 'chat'
+const dialog = useDialog()
+const nMessage = useMessage()
+const notifyPerm = ref(getNotificationPermission())
+
+async function onToggleNotify() {
+  if (notifyPerm.value === 'granted') {
+    nMessage.info('桌面通知已开启，新消息到来时会在桌面右下角进行提醒。')
+    return
+  }
+  if (notifyPerm.value === 'denied') {
+    dialog.info({
+      zIndex: 6000,
+      title: '通知权限已被禁用',
+      content: '你已在浏览器中禁用了本站的桌面通知权限。如需重新开启：\n1. 点击浏览器地址栏左侧的 🔒（锁）或 ℹ️ 图标；\n2. 找到“通知”选项，将其重新修改为“允许”；\n3. 刷新本页面即可生效。',
+      positiveText: '我知道了'
+    })
+    return
+  }
+  const result = await requestNotificationPermission()
+  notifyPerm.value = result
+  if (result === 'granted') {
+    new Notification('桌面通知已开启', { body: '新消息来时会在这里提醒。', icon: '/favicon.svg' })
+  }
+}
 
 function detectMobile() {
   isMobile.value = window.innerWidth < 768
 }
+let permissionStatus = null
+
 onMounted(() => {
   detectMobile()
   window.addEventListener('resize', detectMobile)
+
+  // 监听浏览器桌面通知权限变更以实时同步状态
+  if (typeof navigator !== 'undefined' && navigator.permissions && navigator.permissions.query) {
+    navigator.permissions.query({ name: 'notifications' }).then((status) => {
+      permissionStatus = status
+      const updatePerm = () => {
+        const oldPerm = notifyPerm.value
+        notifyPerm.value = status.state === 'prompt' ? 'default' : status.state
+        // 如果是从非 granted 变到 granted，给出成功的桌面通知反馈
+        if (notifyPerm.value === 'granted' && oldPerm !== 'granted') {
+          new Notification('桌面通知已开启', { body: '当有新消息来时，这里会收到提醒。', icon: '/favicon.svg' })
+        }
+      }
+      updatePerm()
+      status.onchange = updatePerm
+    }).catch(e => {
+      console.warn('Query notification permission status failed', e)
+    })
+  }
 })
+
 onUnmounted(() => {
   window.removeEventListener('resize', detectMobile)
+  if (permissionStatus) {
+    permissionStatus.onchange = null
+  }
 })
 
 // 启动/停用:跟 userStore.token 绑定
@@ -150,6 +237,20 @@ function onMobileBack() {
 }
 .icon-btn:hover { background: #f1f5f9; color: #0c1832; }
 .icon-btn:active { transform: scale(0.92); }
+.icon-btn.sound-on { color: #10b981; }
+.icon-btn.sound-on:hover { color: #059669; }
+.icon-btn.sound-off { color: #64748b; }
+.icon-btn.sound-off:hover { color: #0c1832; }
+.icon-btn.notify-on { color: #10b981; }
+.icon-btn.notify-on:hover { color: #059669; }
+.icon-btn.notify-off { color: #f59e0b; animation: notify-pulse 1.6s ease-in-out infinite; }
+.icon-btn.notify-off:hover { color: #d97706; animation: none; }
+.icon-btn.notify-denied { color: #ef4444; }
+.icon-btn.notify-denied:hover { color: #dc2626; }
+@keyframes notify-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.45); }
+  50% { box-shadow: 0 0 0 6px rgba(245, 158, 11, 0); }
+}
 
 .im-body {
   flex: 1;
