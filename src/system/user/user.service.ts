@@ -2,10 +2,16 @@ import { Injectable } from '@nestjs/common';
 import { UserCreateDto, UserPageListDto, UserUpdateDto } from './dto/create-user.dto';
 import { User } from './entities/user.entity';
 import { InjectModel } from '@nestjs/sequelize';
+import { Op } from 'sequelize';
+import * as crypto from 'crypto';
 import { StaffService } from '../staff/staff.service'
 import { BusinessException } from '../../common/exceptions/business.exception';
 import { Role } from "../role/entities/role.entity";
 import { Staff } from '../staff/entities/staff.entity';
+
+function md5(input: string): string {
+  return crypto.createHash('md5').update(String(input)).digest('hex');
+}
 @Injectable()
 export class UserService {
   constructor(
@@ -81,10 +87,14 @@ export class UserService {
   }
   findOneByUserPass(username: string, password: string) {
 
+    // 兼容历史数据：DB 里同一列可能存的是明文（旧数据 / 早期版本的创建表单）
+    // 也可能存的是 md5（当前创建表单会做 md5）。这里同时按两种形态匹配，
+    // 前端登录传明文即可，服务端会自动尝试明文 + md5 两种匹配。
+    const hashed = md5(password);
     return this.model.findOne({
       where: {
         username,
-        password
+        password: { [Op.or]: [password, hashed] } as any
       },
       include: ['roles', 'department', {
         model: Staff,

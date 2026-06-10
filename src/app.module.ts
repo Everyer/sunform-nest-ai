@@ -28,6 +28,7 @@ import { AiModule } from './modules/ai/ai.module';
 import { AgentModule } from './modules/agent/agent.module';
 import { WorkflowModule } from './system/workflow/workflow.module';
 import { KnowledgeModule } from './modules/knowledge/knowledge.module';
+import { ImModule } from './modules/im/im.module';
 import * as redisStore from 'cache-manager-redis-store';
 import { existsSync } from 'fs';
 
@@ -107,7 +108,8 @@ import { existsSync } from 'fs';
     AiModule,
     AgentModule,
     WorkflowModule,
-    KnowledgeModule
+    KnowledgeModule,
+    ImModule
   ],
 })
 export class AppModule { }

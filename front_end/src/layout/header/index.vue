@@ -24,6 +24,19 @@
 
     <div class="header-right">
       <div class="header-actions">
+        <n-badge
+          :value="imStore.unreadTotal > 0 ? (imStore.unreadTotal > 99 ? '99+' : imStore.unreadTotal) : 0"
+          :show="imStore.unreadTotal > 0"
+          :max="99"
+          :offset="[-2, 2]"
+          color="#dc2626"
+        >
+          <n-button text class="action-btn" @click="imStore.togglePanel()" title="消息">
+            <template #icon>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            </template>
+          </n-button>
+        </n-badge>
         <n-button text class="action-btn" @click="showSettings = true">
           <template #icon>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -104,10 +117,12 @@ import { LogOutOutline } from '@vicons/ionicons5'
 import { useRoute } from 'vue-router'
 import { useUserStore } from '@/store/useUserStore'
 import { useAppStore } from '@/store/useAppStore'
+import { useImStore } from '@/store/useImStore'
 
 const route = useRoute()
 const userStore = useUserStore()
 const appStore = useAppStore()
+const imStore = useImStore()
 
 const showSettings = ref(false)
 const colorPresets = [
@@ -216,6 +231,7 @@ function handleUserAction(key) {
   color: #64748b;
   transition: all 0.2s;
 }
+.action-btn :deep(svg) { display: block; }
 .action-btn:hover {
   background: #f1f5f9;
   color: #0f172a;

@@ -13,10 +13,14 @@ import { AnyExceptionFilter } from './common/filters/any-exception.filter';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger'
 import { knife4jSetup } from 'nestjs-knife4j2'
 import { UserIdInterceptor } from './common/interceptors/userid.interceptor';
+import { IoAdapter } from '@nestjs/platform-socket.io';
 import * as express from 'express';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  // Socket.IO 适配器(用于 IM 实时通道)
+  app.useWebSocketAdapter(new IoAdapter(app));
 
   // 开启全局 CORS 跨域，支持外部系统通过 Ajax 调用设计器相关免检接口
   app.enableCors({

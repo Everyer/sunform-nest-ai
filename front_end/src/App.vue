@@ -3,11 +3,15 @@ import { NConfigProvider, NMessageProvider, NDialogProvider, NGlobalStyle, darkT
 import { useAppStore } from '@/store/useAppStore'
 import { computed, defineComponent, onMounted, ref, onErrorCaptured } from 'vue'
 import GlobalAiChat from '@/components/ai/GlobalAiChat.vue'
+import ImChatModal from '@/components/im/ImChatModal.vue'
 
 const appStore = useAppStore()
 const globalError = ref(null)
 
 // 🌟 判定在嵌入预览模式与独立打印页面下，隐藏全局 AI 助手气泡以保持页面整洁纯粹
+// ⚠️ 注意:这里**不要**根据 imStore.panelOpen 来控制显隐,
+// 否则 <ImChatModal v-if="showGlobalAi" /> 会跟着被卸载,导致点不开会话!
+// AI 浮窗的"被 IM 面板遮挡时隐藏"逻辑放到 GlobalAiChat 组件内部独立处理。
 const showGlobalAi = computed(() => {
   if (typeof window === 'undefined') return true
   const hash = window.location.hash || ''
@@ -215,6 +219,8 @@ function darken(color, percent) {
         </router-view>
         <!-- 全局 AI 智能填报与指令助手 -->
         <GlobalAiChat v-if="showGlobalAi" />
+        <!-- 全局 IM 即时聊天弹层 -->
+        <ImChatModal v-if="showGlobalAi" />
       </n-dialog-provider>
     </n-message-provider>
   </n-config-provider>

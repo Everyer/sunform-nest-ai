@@ -104,7 +104,6 @@
 import { ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { NForm, NInput, NButton, useMessage } from 'naive-ui'
-import md5 from 'js-md5'
 import { useUserStore } from '@/store/useUserStore'
 
 const router = useRouter()
@@ -126,9 +125,11 @@ async function handleLogin() {
   if (errors) return
   loading.value = true
   try {
+    // 后端 findOneByUserPass 同时支持明文与 md5 两种存储形态，
+    // 这里直接传明文，服务端会自行尝试两种匹配，避免历史数据不一致导致登录失败。
     await userStore.loginAction({
       username: formValue.value.username,
-      password: md5(formValue.value.password)
+      password: formValue.value.password
     })
     message.success('登录成功')
     router.push('/')
@@ -342,8 +343,20 @@ async function handleLogin() {
 }
 
 .login-input :deep(.n-input__wrapper) {
-  background: rgba(255,255,255,0.04) !important;
-  border: 1px solid rgba(255,255,255,0.08) !important;
+  /* 🌟 关键：Naive UI 在 n-config-provider 下用 CSS 变量驱动 Input 配色。
+     单纯覆盖 background shorthand 会被主题的 --n-color 抢回去。
+     这里直接重写变量 + 兜底写 background-color，双保险强制深色风格。 */
+  --n-color: rgba(15, 23, 42, 0.55) !important;
+  --n-color-focus: rgba(15, 23, 42, 0.7) !important;
+  --n-text-color: #ffffff !important;
+  --n-placeholder-color: rgba(255, 255, 255, 0.55) !important;
+  --n-border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  --n-border-hover: 1px solid rgba(217, 119, 6, 0.55) !important;
+  --n-border-focus: 1px solid #d97706 !important;
+  --n-box-shadow-focus: 0 0 0 3px rgba(217, 119, 6, 0.15) !important;
+
+  background-color: rgba(15, 23, 42, 0.55) !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
   border-radius: 10px !important;
   height: 48px !important;
   box-shadow: none !important;
@@ -351,22 +364,29 @@ async function handleLogin() {
   padding-left: 14px !important;
 }
 .login-input :deep(.n-input__wrapper:hover) {
-  border-color: rgba(217,119,6,0.25) !important;
+  background-color: rgba(15, 23, 42, 0.7) !important;
+  border-color: rgba(217, 119, 6, 0.55) !important;
 }
 .login-input :deep(.n-input__wrapper.n-input__wrapper--focus) {
+  background-color: rgba(15, 23, 42, 0.78) !important;
   border-color: #d97706 !important;
-  box-shadow: 0 0 0 3px rgba(217,119,6,0.08) !important;
-  background: rgba(255,255,255,0.06) !important;
+  box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.15) !important;
 }
 .login-input :deep(.n-input__input-el) {
-  color: #f1f5f9 !important;
+  color: #ffffff !important;
   font-size: 15px !important;
+  caret-color: #d97706 !important;
 }
 .login-input :deep(.n-input__input-el::placeholder) {
-  color: rgba(255,255,255,0.2) !important;
+  color: rgba(255, 255, 255, 0.55) !important;
+  font-weight: 400;
 }
-.login-input :deep(.n-input__prefix) {
-  color: rgba(255,255,255,0.2) !important;
+.login-input :deep(.n-input__placeholder) {
+  color: rgba(255, 255, 255, 0.55) !important;
+}
+.login-input :deep(.n-input__prefix),
+.login-input :deep(.n-input__suffix) {
+  color: rgba(255, 255, 255, 0.6) !important;
   margin-right: 8px;
 }
 

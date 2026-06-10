@@ -1,7 +1,8 @@
 <template>
   <div class="global-ai-container">
     <!-- FAB 按钮容器，提供固定不动的 hover 热区，防止平移抖动 -->
-    <div class="ai-fab-container">
+    <!-- 当 IM 面板打开时隐藏浮窗按钮,避免和 IM 的发送按钮位置冲突 -->
+    <div v-if="!imStore.panelOpen" class="ai-fab-container">
       <!-- FAB 按钮 -->
       <div
         class="ai-fab"
@@ -220,9 +221,11 @@
 <script setup>
 import { ref, computed, nextTick, onMounted } from 'vue'
 import { useAiFillerStore } from '../../store/useAiFillerStore'
+import { useImStore } from '../../store/useImStore'
 import { marked } from 'marked'
 
 const store = useAiFillerStore()
+const imStore = useImStore()
 const isOpen = ref(false)
 const isMaximized = ref(false)
 const inputText = ref('')
@@ -922,7 +925,7 @@ function scrollToBottom() {
 <style scoped>
 /* ===== Container & FAB ===== */
 .global-ai-container {
-  position: fixed; right: 0; bottom: 24px; z-index: 999999;
+  position: fixed; right: 0; bottom: 24px; z-index: 5000;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   pointer-events: none;
   width: 100px;
@@ -939,7 +942,7 @@ function scrollToBottom() {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 999998;
+  z-index: 4500;
   background: transparent;
 }
 .ai-fab {
