@@ -183,14 +183,40 @@ VALUES
   ('55555555-0000-4000-8000-000000000031', '55555555-0000-4000-8000-000000000030', '打印模板', 'print:list',    TRUE, 'menu', 'PrintOutline',     '/print/list',    'print/list',    NULL, TRUE, 1, NULL, NOW(), NOW()),
   ('55555555-0000-4000-8000-000000000032', '55555555-0000-4000-8000-000000000030', '设计器',   'print:designer',TRUE, 'menu', 'ConstructOutline', '/print/designer','print/index',   NULL, TRUE, 2, NULL, NOW(), NOW());
 
+-- 5.9 一级菜单：在线 Office
+INSERT INTO menus (id, pid, name, code, "isNav", type, icon, path, component, "lowCodeCode", status, sort, remark, "createdAt", "updatedAt")
+VALUES (
+  '55555555-0000-4000-8000-000000000040',
+  NULL,
+  '在线 Office',
+  'office',
+  TRUE,
+  'menu',
+  'DocumentTextOutline',
+  '/office',
+  NULL,
+  NULL,
+  TRUE,
+  4,
+  '常规文档在线预览与协作',
+  NOW(),
+  NOW()
+);
+
+-- 5.10 在线 Office 子菜单
+INSERT INTO menus (id, pid, name, code, "isNav", type, icon, path, component, "lowCodeCode", status, sort, remark, "createdAt", "updatedAt")
+VALUES
+  ('55555555-0000-4000-8000-000000000041', '55555555-0000-4000-8000-000000000040', '在线 Excel', 'office:excel', TRUE, 'menu', 'GridOutline', '/office/excel', 'excel/index', NULL, TRUE, 1, NULL, NOW(), NOW()),
+  ('55555555-0000-4000-8000-000000000042', '55555555-0000-4000-8000-000000000040', '常规文档预览', 'office:preview', TRUE, 'menu', 'EyeOutline', '/office/preview', 'office/preview', NULL, TRUE, 2, NULL, NOW(), NOW());
+
 -- ---------------------------------------------------------------------------
 -- 6. 角色-菜单关联 rolemenus
---   把超管角色和所有 14 个叶子菜单（系统 7 + 工作流 3 + 知识库 2 + 打印 2）关联起来
+--   把超管角色和所有叶子菜单关联起来
 -- ---------------------------------------------------------------------------
 INSERT INTO rolemenus ("roleId", "menuId", "createdAt", "updatedAt")
 SELECT '44444444-4444-4444-8444-444444444444', id, NOW(), NOW()
 FROM menus
-WHERE code LIKE 'system%' OR code LIKE 'workflow%' OR code LIKE 'knowledge%' OR code LIKE 'print%';
+WHERE code LIKE 'system%' OR code LIKE 'workflow%' OR code LIKE 'knowledge%' OR code LIKE 'print%' OR code LIKE 'office%';
 
 -- ---------------------------------------------------------------------------
 -- 7. 用户 users
