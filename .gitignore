@@ -12,6 +12,13 @@ build/
 front_end/dist/
 public/admin/
 
+# user-uploaded IM attachments (chat file/image preview uploads)
+# keep the directory itself via .gitkeep
+public/im-uploads/*
+!public/im-uploads/.gitkeep
+dist/public/im-uploads/*
+!dist/public/im-uploads/.gitkeep
+
 # Logs
 logs
 *.log

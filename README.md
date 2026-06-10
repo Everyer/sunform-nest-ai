@@ -53,6 +53,9 @@ But that only works when the **infrastructure** is solid — strong types, clean
 | 🎨 **Low-code** | 4-layer structure (component / page / project / proxy), visual building |
 | 🔄 **Workflow engine** | Form & flow decoupled, field-level permissions on nodes, Vue Flow visual editor |
 | 🖨 **Print templates** | mm/px-precise JSON template designer, A4 / A5 / A3 all supported |
+| 💬 **Real-time chat** | WebSocket-based IM — system users, 1-on-1 and group conversations, typing & read receipts, browser desktop notifications |
+| 📊 **Online Excel** | [Univer](https://github.com/dream-num/univer)-powered spreadsheet editor with formula bar, conditional formatting, frozen panes, sheet tabs |
+| 📂 **Universal file preview** | Browser-side preview for PDF / Word / image / structured mind-maps — no plugin, no download |
 | 🌐 **WeChat Official Account** | OAuth, template messages, customer-service messages, QR codes, JS-SDK — everything you need |
 | 🛡 **Security** | Required env vars validated at startup, JWT + Passport, SQL injection surface isolated |
 | 📜 **API docs** | Swagger + Knife4j dual stack, auto-synced from comments |
@@ -88,6 +91,16 @@ But that only works when the **infrastructure** is solid — strong types, clean
 | ![Knife4j](docs/screenshots/接口文档.png) |  |
 |:---:|:---:|
 | Knife4j API docs (request / response + debugging) |  |
+
+### 4. Online collaboration — file preview / chat / Excel
+
+| ![File preview](docs/screenshots/万能文件在线预览.png) | ![Online chat](docs/screenshots/在线聊天.png) |
+|:---:|:---:|
+| **Universal file preview** — open PDF / Word / image / structured mind-maps in the browser, no download required | **Real-time chat** on WebSocket — system users, 1-on-1 and group conversations, typing & read receipts, browser desktop notifications |
+
+| ![Online Excel](docs/screenshots/在线excel.png) |  |
+|:---:|:---:|
+| **Online Excel** powered by [Univer](https://github.com/dream-num/univer) — formula bar, conditional formatting, frozen panes, sheet tabs, with chat dockable in the corner |  |
 
 ---
 
