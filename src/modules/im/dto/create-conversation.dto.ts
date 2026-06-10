@@ -38,3 +38,43 @@ export class RenameGroupDto {
     @IsNotEmpty()
     readonly name: string;
 }
+
+export class AddMembersDto {
+    @ApiProperty({ description: '会话 ID', example: 'uuid' })
+    @IsUUID()
+    @IsNotEmpty()
+    readonly conversationId: string;
+
+    @ApiProperty({ description: '新加群成员 ID 列表', example: ['uuid'], type: [String] })
+    @IsArray()
+    @ArrayMinSize(1)
+    @IsUUID('all', { each: true })
+    readonly memberIds: string[];
+}
+
+export class RemoveMemberDto {
+    @ApiProperty({ description: '会话 ID', example: 'uuid' })
+    @IsUUID()
+    @IsNotEmpty()
+    readonly conversationId: string;
+
+    @ApiProperty({ description: '被踢人员用户 ID', example: 'uuid' })
+    @IsUUID()
+    @IsNotEmpty()
+    readonly userId: string;
+}
+
+export class GroupActionDto {
+    @ApiProperty({ description: '会话 ID', example: 'uuid' })
+    @IsUUID()
+    @IsNotEmpty()
+    readonly conversationId: string;
+}
+
+export class RecallMessageDto {
+    @ApiProperty({ description: '消息 ID', example: 'uuid' })
+    @IsUUID()
+    @IsNotEmpty()
+    readonly messageId: string;
+}
+

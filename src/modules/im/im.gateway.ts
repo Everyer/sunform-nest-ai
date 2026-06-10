@@ -217,6 +217,36 @@ export class ImGateway implements OnGatewayConnection, OnGatewayDisconnect {
         }
     }
 
+    broadcastRecall(conversationId: string, payload: any) {
+        this.server.to(`conv:${conversationId}`).emit('message:recall', payload);
+    }
+
+    notifyKicked(userId: string, conversationId: string) {
+        const socketIds = this.presence.getSockets(userId);
+        for (const sid of socketIds) {
+            const socket = this.server.sockets.sockets.get(sid);
+            if (socket) {
+                try {
+                    socket.leave(`conv:${conversationId}`);
+                } catch (e) {}
+            }
+        }
+        this.server.to(`user:${userId}`).emit('conversation:kicked', { conversationId });
+    }
+
+    notifyDismissed(userId: string, conversationId: string) {
+        const socketIds = this.presence.getSockets(userId);
+        for (const sid of socketIds) {
+            const socket = this.server.sockets.sockets.get(sid);
+            if (socket) {
+                try {
+                    socket.leave(`conv:${conversationId}`);
+                } catch (e) {}
+            }
+        }
+        this.server.to(`user:${userId}`).emit('conversation:dismissed', { conversationId });
+    }
+
     private async reloadMessage(messageId: string) {
         const { Message } = await import('./entities/message.entity');
         const { User } = await import('../../system/user/entities/user.entity');

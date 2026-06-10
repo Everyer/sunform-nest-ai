@@ -59,8 +59,36 @@ export function clearHistory(conversationId) {
 // 关键:不要显式设置 Content-Type,让 axios 看到 FormData 后自动生成
 // "multipart/form-data; boundary=----xxx" 头,否则不带 boundary 时 multer 无法
 // 解析分块,会出现文件 0 字节 / 偶发失败的诡异问题(参考 GlobalAiChat.vue:833)。
-export function uploadAttachment(file) {
+export function uploadAttachment(file, onProgress) {
   const fd = new FormData()
   fd.append('file', file, file.name || 'file')
-  return request.post('/im/attachments/upload', fd)
+  return request.post('/im/attachments/upload', fd, {
+    onUploadProgress: onProgress,
+  })
 }
+
+// 邀请新成员加入群聊
+export function addGroupMembers(conversationId, memberIds) {
+  return request.post('/im/conversations/addMembers', { conversationId, memberIds })
+}
+
+// 移出群成员
+export function removeGroupMember(conversationId, userId) {
+  return request.post('/im/conversations/removeMember', { conversationId, userId })
+}
+
+// 退出群聊
+export function leaveGroup(conversationId) {
+  return request.post('/im/conversations/leave', { conversationId })
+}
+
+// 解散群聊
+export function dismissGroup(conversationId) {
+  return request.post('/im/conversations/dismiss', { conversationId })
+}
+
+// 消息撤回(2分钟内)
+export function recallMessage(messageId) {
+  return request.post('/im/messages/recall', { messageId })
+}
+

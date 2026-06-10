@@ -561,4 +561,244 @@ export class ImService {
             mime: file.mimetype,
         };
     }
+
+    // ============================================================
+    // 消息撤回(2分钟以内)
+    // ============================================================
+    async recallMessage(currentUserId: string, messageId: string) {
+        const msg = await this.msgModel.findByPk(messageId);
+        if (!msg) throw new BusinessException('消息不存在');
+        if (msg.senderId !== currentUserId) {
+            throw new BusinessException('您无权撤回他人的消息');
+        }
+
+        const createdTime = new Date(msg.getDataValue('createdAt')).getTime();
+        if (Date.now() - createdTime > 2 * 60 * 1000) {
+            throw new BusinessException('发送时间已超过 2 分钟，无法撤回');
+        }
+
+        const user = await this.userModel.findByPk(currentUserId, {
+            include: [{ model: Staff, attributes: ['staffName'] }],
+        });
+        const name = user?.staff?.staffName || user?.username || '用户';
+
+        msg.type = 'system';
+        msg.content = `"${name}" 撤回了一条消息`;
+        msg.attachmentName = null as any;
+        msg.attachmentUrl = null as any;
+        msg.attachmentSize = null as any;
+        msg.attachmentMime = null as any;
+        msg.replyToMessageId = null as any;
+        await msg.save();
+
+        this.gateway.broadcastRecall(msg.conversationId, {
+            messageId: msg.id,
+            conversationId: msg.conversationId,
+            content: msg.content,
+        });
+
+        return { ok: true };
+    }
+
+    // ============================================================
+    // 邀请成员加入群聊
+    // ============================================================
+    async addGroupMembers(currentUserId: string, conversationId: string, memberIds: string[]) {
+        const conv = await this.convModel.findByPk(conversationId);
+        if (!conv) throw new BusinessException('会话不存在');
+        if (conv.type !== 'group') throw new BusinessException('该会话不是群聊');
+
+        const isMember = await this.assertMember(currentUserId, conversationId);
+        if (!isMember) throw new BusinessException('您不是该群聊的成员');
+
+        const existingMembers = await this.memberModel.findAll({
+            where: { conversationId },
+            attributes: ['userId'],
+        });
+        const existingSet = new Set(existingMembers.map((m) => m.userId));
+        const newIds = memberIds.filter((id) => !existingSet.has(id));
+
+        if (newIds.length === 0) return { ok: true };
+
+        const memberRows = newIds.map((uid) => ({
+            conversationId,
+            userId: uid,
+            role: 'member',
+        }));
+        await this.memberModel.bulkCreate(memberRows as any);
+
+        const operator = await this.userModel.findByPk(currentUserId, {
+            include: [{ model: Staff, attributes: ['staffName'] }],
+        });
+        const opName = operator?.staff?.staffName || operator?.username || '用户';
+
+        const addedUsers = await this.userModel.findAll({
+            where: { id: { [Op.in]: newIds } },
+            include: [{ model: Staff, attributes: ['staffName'] }],
+        });
+        const addedNames = addedUsers.map((u) => u.staff?.staffName || u.username).join('、');
+
+        await this.saveMessage({
+            conversationId,
+            senderId: null,
+            type: 'system',
+            content: `"${opName}" 邀请 "${addedNames}" 加入了群聊`,
+        });
+
+        for (const uid of newIds) {
+            this.gateway.notifyConversationUpdate(uid, conversationId);
+        }
+
+        const allMembers = await this.memberModel.findAll({ where: { conversationId }, attributes: ['userId'] });
+        for (const m of allMembers) {
+            if (!newIds.includes(m.userId)) {
+                this.gateway.notifyConversationUpdate(m.userId, conversationId);
+            }
+        }
+
+        return { ok: true };
+    }
+
+    // ============================================================
+    // 移出群成员
+    // ============================================================
+    async removeGroupMember(currentUserId: string, conversationId: string, targetUserId: string) {
+        const conv = await this.convModel.findByPk(conversationId);
+        if (!conv) throw new BusinessException('会话不存在');
+        if (conv.type !== 'group') throw new BusinessException('该会话不是群聊');
+
+        const opMember = await this.memberModel.findOne({
+            where: { conversationId, userId: currentUserId },
+        });
+        if (!opMember || opMember.role !== 'owner') {
+            throw new BusinessException('只有群主才能移出成员');
+        }
+
+        if (currentUserId === targetUserId) {
+            throw new BusinessException('群主不能移出自己');
+        }
+
+        const targetMember = await this.memberModel.findOne({
+            where: { conversationId, userId: targetUserId },
+        });
+        if (!targetMember) throw new BusinessException('该用户不是群成员');
+
+        const targetUser = await this.userModel.findByPk(targetUserId, {
+            include: [{ model: Staff, attributes: ['staffName'] }],
+        });
+        const targetName = targetUser?.staff?.staffName || targetUser?.username || '用户';
+
+        await targetMember.destroy();
+
+        this.gateway.notifyKicked(targetUserId, conversationId);
+
+        await this.saveMessage({
+            conversationId,
+            senderId: null,
+            type: 'system',
+            content: `"${targetName}" 已被群主移出群聊`,
+        });
+
+        const remaining = await this.memberModel.findAll({ where: { conversationId }, attributes: ['userId'] });
+        for (const m of remaining) {
+            this.gateway.notifyConversationUpdate(m.userId, conversationId);
+        }
+
+        return { ok: true };
+    }
+
+    // ============================================================
+    // 退出群聊
+    // ============================================================
+    async leaveGroup(currentUserId: string, conversationId: string) {
+        const conv = await this.convModel.findByPk(conversationId);
+        if (!conv) throw new BusinessException('会话不存在');
+        if (conv.type !== 'group') throw new BusinessException('该会话不是群聊');
+
+        const myMember = await this.memberModel.findOne({
+            where: { conversationId, userId: currentUserId },
+        });
+        if (!myMember) throw new BusinessException('您不是该群聊的成员');
+
+        const user = await this.userModel.findByPk(currentUserId, {
+            include: [{ model: Staff, attributes: ['staffName'] }],
+        });
+        const name = user?.staff?.staffName || user?.username || '用户';
+
+        if (myMember.role === 'owner') {
+            const otherMembers = await this.memberModel.findAll({
+                where: { conversationId, userId: { [Op.ne]: currentUserId } },
+                order: [['createdAt', 'ASC']],
+            });
+
+            if (otherMembers.length > 0) {
+                const newOwner = otherMembers[0];
+                newOwner.role = 'owner';
+                await newOwner.save();
+
+                const newOwnerUser = await this.userModel.findByPk(newOwner.userId, {
+                    include: [{ model: Staff, attributes: ['staffName'] }],
+                });
+                const newOwnerName = newOwnerUser?.staff?.staffName || newOwnerUser?.username || '用户';
+
+                await this.saveMessage({
+                    conversationId,
+                    senderId: null,
+                    type: 'system',
+                    content: `群主退出了群聊，已将群主自动转让给 "${newOwnerName}"`,
+                });
+            } else {
+                await myMember.destroy();
+                await conv.destroy();
+                return { ok: true, dismissed: true };
+            }
+        } else {
+            await this.saveMessage({
+                conversationId,
+                senderId: null,
+                type: 'system',
+                content: `"${name}" 退出了群聊`,
+            });
+        }
+
+        await myMember.destroy();
+
+        this.gateway.notifyKicked(currentUserId, conversationId);
+
+        const remaining = await this.memberModel.findAll({ where: { conversationId }, attributes: ['userId'] });
+        for (const m of remaining) {
+            this.gateway.notifyConversationUpdate(m.userId, conversationId);
+        }
+
+        return { ok: true };
+    }
+
+    // ============================================================
+    // 解散群聊
+    // ============================================================
+    async dismissGroup(currentUserId: string, conversationId: string) {
+        const conv = await this.convModel.findByPk(conversationId);
+        if (!conv) throw new BusinessException('会话不存在');
+        if (conv.type !== 'group') throw new BusinessException('该会话不是群聊');
+
+        const myMember = await this.memberModel.findOne({
+            where: { conversationId, userId: currentUserId },
+        });
+        if (!myMember || myMember.role !== 'owner') {
+            throw new BusinessException('只有群主才能解散群聊');
+        }
+
+        const members = await this.memberModel.findAll({ where: { conversationId }, attributes: ['userId'] });
+
+        await this.memberModel.destroy({ where: { conversationId } });
+        await this.msgModel.destroy({ where: { conversationId } });
+        await conv.destroy();
+
+        for (const m of members) {
+            this.gateway.notifyDismissed(m.userId, conversationId);
+        }
+
+        return { ok: true };
+    }
 }
+

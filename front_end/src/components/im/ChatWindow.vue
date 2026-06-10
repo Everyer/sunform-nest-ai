@@ -38,6 +38,14 @@
           </div>
         </div>
         <div class="header-right">
+          <button v-if="conv.type === 'group'" class="icon-btn" title="群聊设置" @click="showGroupDrawer = true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+              <circle cx="9" cy="7" r="4"/>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
+          </button>
           <button v-if="conv.type === 'group'" class="icon-btn" title="重命名群聊" @click="onRenameGroup">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M12 20h9"/>
@@ -76,6 +84,8 @@
               :sender-name="item.msg.sender?.staff?.staffName || item.msg.sender?.username || ''"
               :show-name="conv.type === 'group' && item.msg.senderId !== currentUserId && !item.nextSameSender"
               @reply="onSetReply"
+              @jump-to-msg="onJumpToMsg"
+              @recall="onRecallMessage"
             />
           </template>
         </template>
@@ -93,6 +103,93 @@
         @cancel-reply="replyTo = null"
       />
     </template>
+
+    <!-- 群设置抽屉 -->
+    <n-drawer v-model:show="showGroupDrawer" :width="320" placement="right" :z-index="5000">
+      <n-drawer-content title="群聊设置" closable>
+        <div class="group-settings">
+          <div class="settings-section">
+            <div class="section-title">群成员 ({{ groupMembers.length }})</div>
+            <div class="member-grid">
+              <div class="member-card invite-card" @click="showInviteDialog = true">
+                <div class="avatar-box">+</div>
+                <div class="member-name">邀请新成员</div>
+              </div>
+              <div v-for="m in groupMembers" :key="m.userId" class="member-card">
+                <div class="avatar-box">
+                  {{ (m.staffName || m.username || '?').charAt(0) }}
+                  <div
+                    v-if="isGroupOwner && m.userId !== currentUserId"
+                    class="kick-badge"
+                    title="移出群聊"
+                    @click.stop="onKickMember(m)"
+                  >
+                    ×
+                  </div>
+                </div>
+                <div class="member-name" :title="m.staffName || m.username">
+                  {{ m.staffName || m.username }}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-actions">
+            <n-button v-if="isGroupOwner" type="error" ghost block @click="onDismissGroup">
+              解散群聊
+            </n-button>
+            <n-button v-else type="error" ghost block @click="onLeaveGroup">
+              退出群聊
+            </n-button>
+          </div>
+        </div>
+      </n-drawer-content>
+    </n-drawer>
+
+    <!-- 群邀请弹窗 -->
+    <n-modal
+      v-model:show="showInviteDialog"
+      preset="card"
+      style="width: 480px"
+      title="邀请新群员"
+      :z-index="5100"
+    >
+      <div class="invite-dialog-content">
+        <div class="search-box">
+          <input v-model="inviteSearch" placeholder="输入关键字搜索联系人..." class="search-input" />
+        </div>
+        <div class="contact-scroll-list">
+          <div
+            v-for="c in filteredInviteContacts"
+            :key="c.id"
+            class="contact-row"
+            :class="{ selected: selectedInviteIds.includes(c.id) }"
+            @click="toggleInviteMember(c.id)"
+          >
+            <div class="contact-avatar">{{ (c.staffName || c.username).charAt(0) }}</div>
+            <div class="contact-name-meta">
+              <div class="c-name">{{ c.staffName }}</div>
+              <div class="c-meta">{{ c.deptName || c.username }}</div>
+            </div>
+            <div class="checkbox-circle">
+              <svg v-if="selectedInviteIds.includes(c.id)" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+          </div>
+          <div v-if="!filteredInviteContacts.length" class="empty-tip">没有匹配的联系人</div>
+        </div>
+        <div class="form-actions">
+          <n-button @click="showInviteDialog = false">取消</n-button>
+          <n-button
+            type="primary"
+            :disabled="!selectedInviteIds.length"
+            :loading="inviting"
+            @click="handleInviteConfirm"
+          >
+            确定邀请
+          </n-button>
+        </div>
+      </div>
+    </n-modal>
   </div>
 </template>
 
@@ -261,7 +358,7 @@ function onTyping(isTyping) {
 onUnmounted(() => clearTimeout(typingTimer))
 
 // 清空聊天记录(带确认,清完后端数据)
-import { useDialog, useMessage, NInput } from 'naive-ui'
+import { NDrawer, NDrawerContent, NModal, NButton, useDialog, useMessage, NInput } from 'naive-ui'
 import { h, ref as vref } from 'vue'
 const dialog = useDialog()
 const nMessage = useMessage()
@@ -344,6 +441,154 @@ function onRenameGroup() {
         .finally(() => { renaming.value = false })
       return true
     },
+  })
+}
+
+// ============================================================
+// 撤回与引用定位业务逻辑
+// ============================================================
+function onRecallMessage(msgId) {
+  dialog.warning({
+    zIndex: 6000,
+    title: '撤回消息',
+    content: '确定要撤回这条消息吗？',
+    positiveText: '确定',
+    negativeText: '取消',
+    onPositiveClick: async () => {
+      try {
+        await store.recallMessage(msgId)
+        nMessage.success('已撤回消息')
+      } catch (e) {
+        nMessage.error(e.message || '撤回失败，可能发送已超过2分钟')
+      }
+    }
+  })
+}
+
+async function onJumpToMsg(msgId) {
+  const el = document.getElementById(`msg-${msgId}`)
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    el.classList.add('highlight-flash')
+    setTimeout(() => {
+      el.classList.remove('highlight-flash')
+    }, 1500)
+  } else {
+    nMessage.info('被引用的消息较久远，请向上滚动拉取历史消息')
+  }
+}
+
+// ============================================================
+// 群聊管理 Drawer & 邀请逻辑
+// ============================================================
+const showGroupDrawer = ref(false)
+const showInviteDialog = ref(false)
+const inviteSearch = ref('')
+const selectedInviteIds = ref([])
+const inviting = ref(false)
+
+const groupMembers = computed(() => props.conv?.members || [])
+const isGroupOwner = computed(() => {
+  if (!props.conv || props.conv.type !== 'group') return false
+  const owner = groupMembers.value.find((m) => m.role === 'owner')
+  return owner ? owner.userId === currentUserId.value : false
+})
+
+const filteredInviteContacts = computed(() => {
+  const q = inviteSearch.value.trim().toLowerCase()
+  const inGroupIds = new Set(groupMembers.value.map((m) => m.userId))
+  const list = store.contacts.filter((c) => !inGroupIds.has(c.id))
+  if (!q) return list
+  return list.filter((c) =>
+    (c.staffName || '').toLowerCase().includes(q) ||
+    (c.username || '').toLowerCase().includes(q)
+  )
+})
+
+function toggleInviteMember(id) {
+  const i = selectedInviteIds.value.indexOf(id)
+  if (i >= 0) selectedInviteIds.value.splice(i, 1)
+  else selectedInviteIds.value.push(id)
+}
+
+watch(showInviteDialog, (val) => {
+  if (val) {
+    inviteSearch.value = ''
+    selectedInviteIds.value = []
+    store.loadContacts().catch(() => {})
+  }
+})
+
+async function handleInviteConfirm() {
+  if (!selectedInviteIds.value.length || !props.conv) return
+  inviting.value = true
+  try {
+    await store.inviteMembers(props.conv.id, selectedInviteIds.value)
+    nMessage.success('已加入新群员')
+    showInviteDialog.value = false
+  } catch (e) {
+    nMessage.error(e.message || '邀请失败')
+  } finally {
+    inviting.value = false
+  }
+}
+
+function onKickMember(member) {
+  if (!props.conv) return
+  dialog.warning({
+    zIndex: 6000,
+    title: '移出群成员',
+    content: `确定要将 "${member.staffName || member.username}" 移出群聊吗？`,
+    positiveText: '确定移出',
+    negativeText: '取消',
+    onPositiveClick: async () => {
+      try {
+        await store.kickMember(props.conv.id, member.userId)
+        nMessage.success('移出成功')
+      } catch (e) {
+        nMessage.error(e.message || '移出失败')
+      }
+    }
+  })
+}
+
+function onLeaveGroup() {
+  if (!props.conv) return
+  dialog.warning({
+    zIndex: 6000,
+    title: '退出群聊',
+    content: '确定要退出该群聊吗？',
+    positiveText: '确认退出',
+    negativeText: '取消',
+    onPositiveClick: async () => {
+      try {
+        await store.leaveGroup(props.conv.id)
+        nMessage.success('已退出群聊')
+        showGroupDrawer.value = false
+      } catch (e) {
+        nMessage.error(e.message || '退群失败')
+      }
+    }
+  })
+}
+
+function onDismissGroup() {
+  if (!props.conv) return
+  dialog.warning({
+    zIndex: 6000,
+    title: '解散群聊',
+    content: '确定要解散本群聊吗？所有消息都将被清除。',
+    positiveText: '确认解散',
+    negativeText: '取消',
+    onPositiveClick: async () => {
+      try {
+        await store.dismissGroup(props.conv.id)
+        nMessage.success('群聊已解散')
+        showGroupDrawer.value = false
+      } catch (e) {
+        nMessage.error(e.message || '解散群聊失败')
+      }
+    }
   })
 }
 </script>
@@ -452,4 +697,100 @@ function onRenameGroup() {
   padding: 3px 12px;
   border-radius: 12px;
 }
+@keyframes msg-flash {
+  0%, 100% { background: transparent; }
+  30%, 70% { background: rgba(245, 158, 11, 0.25); border-radius: 8px; }
+}
+.highlight-flash {
+  animation: msg-flash 1.5s ease-in-out;
+}
+
+/* 群设置与邀请样式 */
+.group-settings {
+  display: flex; flex-direction: column;
+  height: 100%; justify-content: space-between;
+  gap: 20px;
+}
+.settings-section {
+  flex: 1; overflow-y: auto;
+}
+.section-title {
+  font-size: 13px; font-weight: 600; color: #475569;
+  margin-bottom: 12px;
+}
+.member-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px 8px;
+}
+.member-card {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 6px; cursor: pointer;
+}
+.member-card .avatar-box {
+  width: 42px; height: 42px; border-radius: 50%;
+  background: linear-gradient(135deg, #cbd5e1, #94a3b8);
+  color: #fff; font-size: 13.5px; font-weight: 600;
+  display: flex; align-items: center; justify-content: center;
+  position: relative;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  transition: all 0.2s;
+}
+.member-card:hover .avatar-box { transform: translateY(-2px); }
+.invite-card .avatar-box {
+  background: #f1f5f9; color: #64748b; border: 1.5px dashed #cbd5e1;
+  box-shadow: none;
+}
+.member-name {
+  font-size: 11px; color: #475569; font-weight: 500;
+  max-width: 68px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.kick-badge {
+  position: absolute; top: -3px; right: -3px;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: #ef4444; color: #fff; font-size: 11px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; border: 1.5px solid #fff;
+  font-weight: 700;
+}
+.kick-badge:hover { background: #dc2626; }
+.settings-actions {
+  padding-top: 14px; border-top: 1px solid #e2e8f0;
+  display: flex; flex-direction: column; gap: 8px;
+}
+
+.invite-dialog-content {
+  display: flex; flex-direction: column; gap: 14px;
+}
+.contact-scroll-list {
+  max-height: 280px; overflow-y: auto;
+  border: 1px solid #e2e8f0; border-radius: 8px;
+  padding: 4px;
+}
+.contact-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px; border-radius: 6px; cursor: pointer;
+  transition: background 0.2s;
+}
+.contact-row:hover { background: #f8f9fc; }
+.contact-row.selected { background: rgba(12,24,50,0.04); }
+.contact-avatar {
+  width: 32px; height: 32px; border-radius: 50%;
+  background: linear-gradient(135deg, #0c1832, #1a2d4a);
+  color: #fff; font-weight: 600; font-size: 12px;
+  display: flex; align-items: center; justify-content: center;
+}
+.contact-name-meta { flex: 1; min-width: 0; }
+.c-name { font-size: 13px; font-weight: 500; color: #0f172a; }
+.c-meta { font-size: 11px; color: #94a3b8; }
+.checkbox-circle {
+  width: 20px; height: 20px; border-radius: 50%;
+  border: 1.5px solid #cbd5e1; display: flex;
+  align-items: center; justify-content: center; color: #fff;
+  transition: all 0.2s;
+}
+.contact-row.selected .checkbox-circle {
+  background: #0c1832; border-color: #0c1832;
+}
+.form-actions { display: flex; justify-content: flex-end; gap: 8px; }
 </style>

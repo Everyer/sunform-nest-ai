@@ -1,5 +1,13 @@
 <template>
   <div class="im-input-container">
+    <!-- 上传进度条 -->
+    <div v-if="store.uploadProgress > 0" class="upload-progress-bar">
+      <div class="progress-track">
+        <div class="progress-fill" :style="{ width: store.uploadProgress + '%' }"></div>
+      </div>
+      <div class="progress-text">正在上传附件: {{ store.uploadProgress }}%</div>
+    </div>
+
     <!-- 引用条(引用某条消息时显示) -->
     <div v-if="replyTo" class="reply-bar">
       <div class="reply-bar-inner">
@@ -72,6 +80,7 @@
 
 <script setup>
 import { ref, computed, nextTick, watch, onMounted, onUnmounted } from 'vue'
+import { useImStore } from '@/store/useImStore'
 
 const props = defineProps({
   convId: { type: String, required: true },
@@ -85,6 +94,7 @@ const props = defineProps({
   placeholder: { type: String, default: '输入消息...' },
 })
 const emit = defineEmits(['send', 'send-typing', 'cancel-reply'])
+const store = useImStore()
 
 const text = ref('')
 const textRef = ref(null)
@@ -208,16 +218,30 @@ function onPickMention(m) {
 function onPaste(e) {
   const cbd = e.clipboardData
   if (!cbd) return
+  const maxSize = 20 * 1024 * 1024 // 20MB
   for (const item of cbd.items) {
     if (item.kind === 'file') {
       const file = item.getAsFile()
-      if (file) pendingAttachments.value.push(file)
+      if (file) {
+        if (file.size > maxSize) {
+          message.error(`粘贴文件 "${file.name || '图片'}" 超过 20MB 限制`)
+          continue
+        }
+        pendingAttachments.value.push(file)
+      }
     }
   }
 }
 
 function onFilePick(e) {
-  for (const f of e.target.files) pendingAttachments.value.push(f)
+  const maxSize = 20 * 1024 * 1024 // 20MB
+  for (const f of e.target.files) {
+    if (f.size > maxSize) {
+      message.error(`文件 "${f.name}" 超过 20MB 限制`)
+      continue
+    }
+    pendingAttachments.value.push(f)
+  }
   e.target.value = ''
 }
 
@@ -420,4 +444,22 @@ onUnmounted(() => document.removeEventListener('mousedown', onDocClick))
 .mention-name { font-size: 12.5px; color: #0f172a; font-weight: 500; }
 .mention-meta { font-size: 10.5px; color: #94a3b8; }
 .mention-empty { padding: 14px; text-align: center; font-size: 12px; color: #94a3b8; }
+
+/* 上传进度条 */
+.upload-progress-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px;
+  background: #f0fdf4; border: 1px solid #bbf7d0;
+  border-radius: 8px; padding: 6px 12px;
+  font-size: 11px; color: #15803d;
+}
+.progress-track {
+  flex: 1; height: 6px; background: #dcfce7;
+  border-radius: 3px; overflow: hidden;
+}
+.progress-fill {
+  height: 100%; background: #16a34a;
+  transition: width 0.2s ease-out;
+}
+.progress-text { font-weight: 600; font-family: monospace; white-space: nowrap; }
 </style>

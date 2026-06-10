@@ -44,7 +44,10 @@
             <span class="conv-time">{{ formatTime(conv.lastMessageAt) }}</span>
           </div>
           <div class="conv-line2">
-            <span class="conv-preview">{{ previewText(conv) }}</span>
+            <span class="conv-preview">
+              <span v-if="hasMention(conv)" class="mention-tag">[有人@我] </span>
+              {{ previewText(conv) }}
+            </span>
             <span v-if="conv.unread > 0" class="unread-badge">{{ conv.unread > 99 ? '99+' : conv.unread }}</span>
           </div>
         </div>
@@ -95,6 +98,20 @@ function previewText(conv) {
   if (m.type === 'file') return `[文件] ${m.attachmentName || ''}`
   if (m.type === 'system') return m.content || '系统消息'
   return ''
+}
+
+function hasMention(conv) {
+  if (conv.type !== 'group') return false
+  if (!conv.unread || conv.unread <= 0) return false
+  const m = conv.lastMessage
+  if (!m || !m.mentions) return false
+  try {
+    const list = typeof m.mentions === 'string' ? JSON.parse(m.mentions) : m.mentions
+    if (Array.isArray(list)) {
+      return list.includes(store.currentUserId)
+    }
+  } catch (e) {}
+  return false
 }
 
 function formatTime(t) {
@@ -240,5 +257,9 @@ function pad(n) { return n < 10 ? '0' + n : n }
   flex-shrink: 0;
   min-width: 18px; text-align: center;
   box-shadow: 0 1px 3px rgba(220,38,38,0.3);
+}
+.mention-tag {
+  color: #ef4444;
+  font-weight: 700;
 }
 </style>

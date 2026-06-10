@@ -11,6 +11,11 @@ import {
   markRead,
   uploadAttachment,
   clearHistory as clearHistoryApi,
+  addGroupMembers,
+  removeGroupMember,
+  leaveGroup as leaveGroupApi,
+  dismissGroup as dismissGroupApi,
+  recallMessage as recallMessageApi,
 } from '@/api/im'
 import { imSocket } from '@/utils/imSocket'
 import { showNotification, getNotificationPermission, playNotificationSound } from '@/utils/notification'
@@ -28,6 +33,7 @@ export const useImStore = defineStore('im', () => {
   const soundEnabled = ref(localStorage.getItem('im_sound_enabled') !== 'false') // 声音提醒开关，默认开启
   const loaded = ref(false) // 是否已加载过会话列表
   const loadingMessages = ref(false)
+  const uploadProgress = ref(0) // 上传进度 (0-100)
   const unreadTotal = ref(0) // 总未读(用于 header 红点)
   const currentUserId = ref('')
 
@@ -275,17 +281,26 @@ export const useImStore = defineStore('im', () => {
 
   // ===== 发送附件 =====
   async function sendAttachment(convId, file) {
-    const res = await uploadAttachment(file)
-    const data = res.data || res
-    const isImage = (data.mime || '').startsWith('image/')
-    return sendMessage(convId, {
-      type: isImage ? 'image' : 'file',
-      content: isImage ? '[图片]' : '[文件]',
-      attachmentName: data.name,
-      attachmentUrl: data.url,
-      attachmentSize: data.size,
-      attachmentMime: data.mime,
-    })
+    uploadProgress.value = 0
+    try {
+      const res = await uploadAttachment(file, (evt) => {
+        if (evt.total) {
+          uploadProgress.value = Math.round((evt.loaded * 100) / evt.total)
+        }
+      })
+      const data = res.data || res
+      const isImage = (data.mime || '').startsWith('image/')
+      return sendMessage(convId, {
+        type: isImage ? 'image' : 'file',
+        content: isImage ? '[图片]' : '[文件]',
+        attachmentName: data.name,
+        attachmentUrl: data.url,
+        attachmentSize: data.size,
+        attachmentMime: data.mime,
+      })
+    } finally {
+      uploadProgress.value = 0
+    }
   }
 
   // ===== 发送输入事件 =====
@@ -355,12 +370,23 @@ export const useImStore = defineStore('im', () => {
 
   // ===== 绑定 socket 事件 =====
   function bindSocketEvents() {
+    imSocket.on('connect', () => {
+      if (loaded.value) {
+        loadConversations(true).catch(() => {})
+        if (activeConvId.value) {
+          loadHistory(activeConvId.value).catch(() => {})
+        }
+      }
+    })
     imSocket.on('message:new', receiveMessage)
     imSocket.on('message:read', receiveRead)
+    imSocket.on('message:recall', receiveMessageRecall)
     imSocket.on('typing', receiveTyping)
     imSocket.on('presence', receivePresence)
     imSocket.on('conversation:cleared', receiveConversationCleared)
     imSocket.on('conversation:updated', receiveConversationUpdated)
+    imSocket.on('conversation:kicked', receiveConversationKicked)
+    imSocket.on('conversation:dismissed', receiveConversationDismissed)
     imSocket.on('conversation:update', () => {
       loadConversations(true).catch(() => {})
     })
@@ -369,10 +395,13 @@ export const useImStore = defineStore('im', () => {
   function unbindSocketEvents() {
     imSocket.off('message:new', receiveMessage)
     imSocket.off('message:read', receiveRead)
+    imSocket.off('message:recall', receiveMessageRecall)
     imSocket.off('typing', receiveTyping)
     imSocket.off('presence', receivePresence)
     imSocket.off('conversation:cleared', receiveConversationCleared)
     imSocket.off('conversation:updated', receiveConversationUpdated)
+    imSocket.off('conversation:kicked', receiveConversationKicked)
+    imSocket.off('conversation:dismissed', receiveConversationDismissed)
   }
 
   // ===== 启动 / 停用 =====
@@ -403,6 +432,98 @@ export const useImStore = defineStore('im', () => {
     if (val) {
       playNotificationSound()
     }
+  }
+
+  // 实时:接收撤回广播
+  function receiveMessageRecall({ messageId, conversationId, content }) {
+    if (!messageId || !conversationId) return
+    const list = messagesByConv.value[conversationId] || []
+    const idx = list.findIndex((m) => m.id === messageId)
+    if (idx >= 0) {
+      list[idx].type = 'system'
+      list[idx].content = content
+      list[idx].attachmentName = null
+      list[idx].attachmentUrl = null
+      list[idx].attachmentSize = null
+      list[idx].attachmentMime = null
+      list[idx].replyToMessageId = null
+      messagesByConv.value[conversationId] = [...list]
+    }
+    const cIdx = conversations.value.findIndex((c) => c.id === conversationId)
+    if (cIdx >= 0) {
+      const c = conversations.value[cIdx]
+      if (c.lastMessage && c.lastMessage.id === messageId) {
+        c.lastMessage.type = 'system'
+        c.lastMessage.content = content
+        c.lastMessage.attachmentName = null
+      }
+    }
+  }
+
+  // 实时:接收被踢广播
+  function receiveConversationKicked({ conversationId }) {
+    if (!conversationId) return
+    conversations.value = conversations.value.filter((c) => c.id !== conversationId)
+    computeUnread()
+    if (activeConvId.value === conversationId) {
+      activeConvId.value = null
+    }
+  }
+
+  // 实时:接收群解散广播
+  function receiveConversationDismissed({ conversationId }) {
+    if (!conversationId) return
+    conversations.value = conversations.value.filter((c) => c.id !== conversationId)
+    computeUnread()
+    if (messagesByConv.value[conversationId]) {
+      delete messagesByConv.value[conversationId]
+    }
+    if (activeConvId.value === conversationId) {
+      activeConvId.value = null
+    }
+  }
+
+  // 撤回消息 API 触发
+  async function recallMessage(msgId) {
+    await recallMessageApi(msgId)
+  }
+
+  // 群聊拉人
+  async function inviteMembers(convId, userIds) {
+    await addGroupMembers(convId, userIds)
+    await loadConversations(true)
+    if (activeConvId.value === convId) {
+      const res = await getConversationDetail(convId)
+      const idx = conversations.value.findIndex((c) => c.id === convId)
+      if (idx >= 0) {
+        conversations.value[idx].members = res.data?.members || res.members || []
+      }
+    }
+  }
+
+  // 群聊踢人
+  async function kickMember(convId, userId) {
+    await removeGroupMember(convId, userId)
+    await loadConversations(true)
+    if (activeConvId.value === convId) {
+      const res = await getConversationDetail(convId)
+      const idx = conversations.value.findIndex((c) => c.id === convId)
+      if (idx >= 0) {
+        conversations.value[idx].members = res.data?.members || res.members || []
+      }
+    }
+  }
+
+  // 退群
+  async function leaveGroup(convId) {
+    await leaveGroupApi(convId)
+    await loadConversations(true)
+  }
+
+  // 解散群聊
+  async function dismissGroup(convId) {
+    await dismissGroupApi(convId)
+    await loadConversations(true)
   }
 
   function parseJwtSub(token) {
@@ -461,6 +582,12 @@ export const useImStore = defineStore('im', () => {
     stop,
     setCurrentUser,
     setSoundEnabled,
+    uploadProgress,
+    recallMessage,
+    inviteMembers,
+    kickMember,
+    leaveGroup,
+    dismissGroup,
   }
 })
 

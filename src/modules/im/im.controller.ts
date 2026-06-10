@@ -10,6 +10,10 @@ import {
     CreateDirectConversationDto,
     CreateGroupConversationDto,
     RenameGroupDto,
+    AddMembersDto,
+    RemoveMemberDto,
+    GroupActionDto,
+    RecallMessageDto,
 } from './dto/create-conversation.dto';
 import { QueryMessageDto, MarkReadDto } from './dto/query-message.dto';
 
@@ -107,6 +111,36 @@ export class ImController {
     @Post('messages/clear')
     async clearHistory(@Body() dto: { conversationId: string }, @Req() req: any) {
         return this.service.clearHistory(req.user.id, dto.conversationId);
+    }
+
+    @ApiOperation({ summary: '消息撤回(2分钟内)' })
+    @Post('messages/recall')
+    async recallMessage(@Body() dto: RecallMessageDto, @Req() req: any) {
+        return this.service.recallMessage(req.user.id, dto.messageId);
+    }
+
+    @ApiOperation({ summary: '邀请新群成员' })
+    @Post('conversations/addMembers')
+    async addGroupMembers(@Body() dto: AddMembersDto, @Req() req: any) {
+        return this.service.addGroupMembers(req.user.id, dto.conversationId, dto.memberIds);
+    }
+
+    @ApiOperation({ summary: '踢出群成员(仅群主)' })
+    @Post('conversations/removeMember')
+    async removeGroupMember(@Body() dto: RemoveMemberDto, @Req() req: any) {
+        return this.service.removeGroupMember(req.user.id, dto.conversationId, dto.userId);
+    }
+
+    @ApiOperation({ summary: '退出群聊' })
+    @Post('conversations/leave')
+    async leaveGroup(@Body() dto: GroupActionDto, @Req() req: any) {
+        return this.service.leaveGroup(req.user.id, dto.conversationId);
+    }
+
+    @ApiOperation({ summary: '解散群聊(仅群主)' })
+    @Post('conversations/dismiss')
+    async dismissGroup(@Body() dto: GroupActionDto, @Req() req: any) {
+        return this.service.dismissGroup(req.user.id, dto.conversationId);
     }
 
     @ApiOperation({ summary: '上传附件' })

@@ -1,5 +1,5 @@
 <template>
-  <div class="msg-row" :class="isMine ? 'mine' : 'theirs'">
+  <div :id="`msg-${message.id}`" class="msg-row" :class="isMine ? 'mine' : 'theirs'">
     <!-- 对方头像(我方不显示头像,由 ChatWindow 右侧统一显示) -->
     <div v-if="!isMine" class="avatar">
       {{ avatarLetter }}
@@ -22,7 +22,7 @@
       <div v-else class="bubble-wrap" :class="isMine ? 'wrap-mine' : 'wrap-theirs'">
         <div class="bubble-content">
           <!-- 引用预览(此条消息引用了另一条) -->
-          <div v-if="message.replyTo" class="quote-card" :class="isMine ? 'quote-mine' : 'quote-theirs'">
+          <div v-if="message.replyTo" class="quote-card interactive" :class="isMine ? 'quote-mine' : 'quote-theirs'" title="点击跳转到原消息" @click="emit('jump-to-msg', message.replyTo.id)">
             <div class="quote-bar"></div>
             <div class="quote-content">
               <div class="quote-name">
@@ -65,8 +65,16 @@
           </template>
         </div>
 
+        <!-- 撤回按钮:如果是自己发送且在2分钟内,wrap hover 时显示 -->
+        <button v-if="canRecall" class="reply-action recall-action" title="撤回消息" @click="emit('recall', message.id)">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+            <path d="M3 3v5h5"/>
+          </svg>
+        </button>
+
         <!-- 引用按钮:flex 兄弟节点,默认 visibility:hidden 但占位,hover wrap 时显示 -->
-        <button class="reply-action" title="引用回复" @click="$emit('reply', message)">
+        <button class="reply-action" title="引用回复" @click="emit('reply', message)">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="9 17 4 12 9 7"/>
             <path d="M20 18v-2a4 4 0 0 0-4-4H4"/>
@@ -101,7 +109,18 @@ const props = defineProps({
   showName: { type: Boolean, default: false },
   readByOthers: { type: Boolean, default: false },
 })
-defineEmits(['reply'])
+const emit = defineEmits(['reply', 'jump-to-msg', 'recall'])
+
+// 判断 2 分钟内是否可撤回
+const canRecall = computed(() => {
+  if (!props.isMine) return false
+  if (props.message.type === 'system') return false
+  const t = props.message.createdAt
+  if (!t) return false
+  const d = new Date(t)
+  if (isNaN(d.getTime())) return false
+  return Date.now() - d.getTime() < 2 * 60 * 1000
+})
 
 const avatarLetter = computed(() => {
   const name = props.senderName || (props.isMine ? '我' : '?')
@@ -244,6 +263,17 @@ function openImage() {
   max-width: 100%;
   background: #e2e8f0;
   border-left: 3px solid #94a3b8;
+}
+.quote-card.interactive {
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.quote-card.interactive:hover {
+  background: #cbd5e1;
+}
+.recall-action:hover {
+  color: #ea580c !important;
+  background: #fff7ed !important;
 }
 .quote-bar { display: none; } /* 改用 border-left 做引用条 */
 .quote-content { min-width: 0; flex: 1; }
